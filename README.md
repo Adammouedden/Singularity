@@ -1,1 +1,1 @@
-# Singularity: The next generation reasoning model
+# Singularity: Deep Reasoning Model
