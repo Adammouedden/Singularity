@@ -2,8 +2,7 @@
 """
 This is the action proposer.
 """
-from typing import List, Optional
-from pydantic import BaseModel, Field
+from schemas.schemas import CandidateActions
 from google import genai
 import os
 from dotenv import load_dotenv
@@ -11,30 +10,6 @@ load_dotenv(dotenv_path=".env")
 
 API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = "gemini-2.5-flash"
-
-class ActionCandidate(BaseModel):
-    action: str = Field(
-        description="One of ACTION1, ACTION2, ACTION3, ACTION4, ACTION5, ACTION6, ACTION7"
-    )
-    x: Optional[int] = Field(
-        default=None,
-        description="x coordinate if action is ACTION6, else null"
-    )
-    y: Optional[int] = Field(
-        default=None,
-        description="y coordinate if action is ACTION6, else null"
-    )
-    rationale: Optional[str] = Field(
-        default=None,
-        description="Short explanation for why this action may help"
-    )
-
-
-class CandidateActions(BaseModel):
-    candidates: List[ActionCandidate] = Field(
-        description="Top 3 candidate next actions"
-    )
-
 
 class GeminiWorldModel:
     def __init__(self, model_name: str = GEMINI_MODEL):
