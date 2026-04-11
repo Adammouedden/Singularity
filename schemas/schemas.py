@@ -22,3 +22,10 @@ class CandidateActions(BaseModel):
     candidates: List[ActionCandidate] = Field(
         description="Top 3 candidate next actions"
     )
+
+class ScoredAction(BaseModel):
+    index: int = Field(description="Index of the action in input list")
+    score: float = Field(description="Score from 0.0 to 1.0")
+
+class EvaluationResult(BaseModel):
+    results: List[ScoredAction]
