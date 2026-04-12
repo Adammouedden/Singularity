@@ -29,3 +29,39 @@ class ScoredAction(BaseModel):
 
 class EvaluationResult(BaseModel):
     results: List[ScoredAction]
+
+class EnvState(BaseModel):
+    frame: List[List[int]]  # 64x64 grid
+    state: str              # "RUNNING", "WIN", "GAME_OVER"
+    score: float
+    available_actions: List[int]
+    step_index: int
+    guid: Optional[str] = None
+    game_id: Optional[str] = None
+    card_id: Optional[str] = None
+
+class MCTSNode(BaseModel):
+    node_id: str
+    parent_id: Optional[str] = None
+
+    # Action taken from parent -> this node
+    action: Optional[ActionCandidate] = None
+
+    # Full sequence from root to this node
+    action_sequence: List[ActionCandidate] = Field(default_factory=list)
+
+    # Snapshot of environment after applying action_sequence
+    state: EnvState
+
+    visits: int = 0
+    total_value: float = 0.0
+    mean_value: float = 0.0
+
+    is_terminal: bool = False
+    depth: int = 0
+
+class MCTSDecision(BaseModel):
+    root_state: EnvState
+    candidates: List[ActionCandidate]
+    children_stats: List[dict]
+    best_action: ActionCandidate
