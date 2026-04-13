@@ -70,6 +70,7 @@ def main():
         api_key=API_KEY,
         game_id=game_id,
         card_id=card_id,
+        session=session,
     )
 
     proposer = GeminiWorldModel()
@@ -100,7 +101,7 @@ def main():
             print(f"{i}. {stat}")
 
         # Execute best action in the live episode
-        next_state = env.step(root_state, decision.best_action)
+        next_state = env.step(root_state, f"BEST ACTION TAKEN: {decision.best_action}")
 
         print("\n=== AFTER EXECUTING BEST ACTION ===")
         print("State:", next_state.state)
@@ -109,7 +110,8 @@ def main():
 
     finally:
         close_scorecard(session, card_id)
-        print(f"\nClosed scorecard: {card_id}")
+        print("Scorecard closed!")
+        print(f"\nView results at: {ROOT_URL}/scorecards/{card_id}")
 
 
 if __name__ == "__main__":

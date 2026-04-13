@@ -11,7 +11,7 @@ import requests
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv(dotenv_path="../.env")
+load_dotenv(dotenv_path=".env")
 
 # Setup
 ROOT_URL = "https://arcprize.org"
@@ -74,7 +74,7 @@ print(f"Game started! State: {state}, Score: {score}\n")
 print("STEP 4: Taking random actions...")
 actions = ["ACTION1", "ACTION2", "ACTION3", "ACTION4", "ACTION5", "ACTION6", "ACTION7"]
 
-for i in range(5):
+for i in range(1):
     # Check if game is over
     if state in ["WIN", "GAME_OVER"]:
         print(f"\nGame ended! Final state: {state}, Score: {score}")
@@ -87,7 +87,8 @@ for i in range(5):
     request_data = {
         "game_id": game_id,
         "card_id": card_id,
-        "guid": guid
+        "guid": guid,
+        "reasoning": "Test!"
     }
     
     # ACTION6 needs x,y coordinates
@@ -97,13 +98,19 @@ for i in range(5):
         print(f"Action {i+1}: {action} at ({request_data['x']}, {request_data['y']})", end="")
     else:
         print(f"Action {i+1}: {action}", end="")
+    print("")
     
+    print(f"DEBUG POST: {ROOT_URL}/api/cmd/{action}")
+    print(f"DEBUG PAYLOAD: {request_data}")
+
     # Take the action
     response = session.post(
         f"{ROOT_URL}/api/cmd/{action}",
         json=request_data
     )
     
+    print(f"DEBUG status: {response.status_code}")
+    print(f"DEBUG body: {response.text}")
     game_data = response.json()
     state = game_data["state"]
     score = game_data.get("score", 0)

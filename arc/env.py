@@ -17,6 +17,7 @@ class ARCEnvironment:
         api_key: Optional[str] = None,
         game_id: Optional[str] = None,
         card_id: Optional[str] = None,
+        session: Optional[requests.Session] = None,
     ):
         self.root_url = root_url.rstrip("/")
         self.api_key = api_key or os.getenv("ARC_API_KEY")
@@ -26,11 +27,15 @@ class ARCEnvironment:
         if not self.api_key:
             raise ValueError("Missing ARC_API_KEY in environment or constructor.")
 
-        self.session = requests.Session()
-        self.session.headers.update({
-            "X-API-Key": self.api_key,
-            "Accept": "application/json",
-        })
+        # Reuse caller session if provided
+        if session is not None:
+            self.session = session
+        else:
+            self.session = requests.Session()
+            self.session.headers.update({
+                "X-API-Key": self.api_key,
+                "Accept": "application/json",
+            })
 
     def set_game_context(self, game_id: str, card_id: str) -> None:
         self.game_id = game_id
@@ -42,9 +47,25 @@ class ARCEnvironment:
         if not self.card_id:
             raise ValueError("card_id is not set.")
 
+    def _normalize_frame(self, frame):
+        """
+        Some ARC responses appear to wrap the 64x64 grid in an extra outer list.
+        Normalize to List[List[int]].
+        """
+        if not frame:
+            return frame
+
+        # If frame[0][0] is itself a list, then frame is likely [grid]
+        if isinstance(frame, list) and isinstance(frame[0], list) and len(frame[0]) > 0 and isinstance(frame[0][0], list):
+            return frame[0]
+
+        return frame
+
     def _to_env_state(self, game_data: dict, step_index: int) -> EnvState:
+        normalized_frame = self._normalize_frame(game_data.get("frame"))
+
         return EnvState(
-            frame=game_data["frame"],
+            frame=normalized_frame,
             state=game_data["state"],
             score=float(game_data.get("score", 0.0)),
             available_actions=game_data.get("available_actions", []),
@@ -56,6 +77,7 @@ class ARCEnvironment:
 
     def _post_cmd(self, action_name: str, payload: dict) -> dict:
         url = f"{self.root_url}/api/cmd/{action_name}"
+
         response = self.session.post(url, json=payload)
 
         if response.status_code != 200:
@@ -100,6 +122,7 @@ class ARCEnvironment:
             "game_id": self.game_id,
             "card_id": self.card_id,
             "guid": state.guid,
+            "reasoning": action.rationale
         }
 
         action_name = action.action
