@@ -1,2 +1,8 @@
-arc-agi
-torch
+arc_agi==0.9.6
+arcengine==0.9.3
+asposestorage==1.0.2
+einops==0.8.2
+flash_attn==2.8.3
+numpy==2.4.4
+pydantic==2.13.0
+torch==2.11.0

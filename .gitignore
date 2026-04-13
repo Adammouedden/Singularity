@@ -1,6 +1,3 @@
-<<<<<<< HEAD
 /examples
-/.venv
-=======
-.venv
->>>>>>> 003930496892cb49b4121e3886c2385e52c23cdf
+.venv/
+.python-version
