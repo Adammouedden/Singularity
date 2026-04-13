@@ -10,7 +10,7 @@ from world_models.gemini_world_model import GeminiWorldModel
 from evaluation.critic import GeminiCritic
 from search.mcts import RootOnlySearch
 
-load_dotenv(dotenv_path="../.env")
+load_dotenv(dotenv_path=".env")
 
 ROOT_URL = "https://arcprize.org"
 API_KEY = os.getenv("ARC_API_KEY")
@@ -59,7 +59,7 @@ def main():
         "Accept": "application/json",
     })
 
-    game_id = get_random_game_id(session)
+    game_id = "ls20-9607627b" #get_random_game_id(session)
     card_id = open_scorecard(session)
 
     print(f"Selected game_id: {game_id}")

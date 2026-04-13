@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path="../.env")
 
 # Setup
-ROOT_URL = "https://three.arcprize.org"
+ROOT_URL = "https://arcprize.org"
 API_KEY = os.getenv("ARC_API_KEY")
 
 # Create a session with headers

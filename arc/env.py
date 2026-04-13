@@ -7,13 +7,13 @@ from dotenv import load_dotenv
 
 from schemas.schemas import ActionCandidate, EnvState
 
-load_dotenv(dotenv_path="../.env")
+load_dotenv(dotenv_path=".env")
 
 
 class ARCEnvironment:
     def __init__(
         self,
-        root_url: str = "https://three.arcprize.org",
+        root_url: str = "https://arcprize.org",
         api_key: Optional[str] = None,
         game_id: Optional[str] = None,
         card_id: Optional[str] = None,
