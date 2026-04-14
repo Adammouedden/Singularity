@@ -6,6 +6,7 @@ uv is a modern python package manager & virtual environment manager
 
 It is written in rust and performs 10x - 100x faster than pip + venv combo, which is already faster than conda
 
+```uv init ``` is the command to initialize a new project in the current directory, this has already been done
 ``` uv sync ``` is a command that creates a .venv folder, tailored to the specifications in ```pyproject.toml```
 ``` uv.lock ``` is a file that contains versions of installed modules/packages. If you are familiar with npm, this is similar to ```package-lock.json```
 
