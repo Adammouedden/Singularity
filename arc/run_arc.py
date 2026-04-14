@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from arc.env import ARCEnvironment
 from world_models.gemini_world_model import GeminiWorldModel
 from evaluation.critic import GeminiCritic
-from search.mcts import RootOnlySearch
+from search.mcts import RootDepthTwoSearch, RootOnlySearch
 
 load_dotenv(dotenv_path=".env")
 
@@ -75,11 +75,13 @@ def main():
 
     proposer = GeminiWorldModel()
     critic = GeminiCritic()
-    searcher = RootOnlySearch(
+    searcher = RootDepthTwoSearch( #RootOnlySearch(
         proposer=proposer,
         critic=critic,
         env=env,
-        num_top_actions_to_replay=2,
+        num_top_root_actions_to_replay=2, #num_top_actions_to_replay=2,
+        num_top_child_actions_to_replay=1,
+        discount=0.8,
     )
 
     try:
@@ -101,13 +103,19 @@ def main():
             print(f"{i}. {stat}")
 
         # Execute best action in the live episode
-        next_state = env.step(root_state, f"BEST ACTION TAKEN: {decision.best_action}")
+        decision.best_action.rationale = f"BEST ACTION TAKEN: {decision.best_action.rationale}"
+        next_state = env.step(root_state, decision.best_action)
 
         print("\n=== AFTER EXECUTING BEST ACTION ===")
         print("State:", next_state.state)
         print("Score:", next_state.score)
         print("Available actions:", next_state.available_actions)
 
+        print("\n=== SEARCH TREE ===")
+        for stat in decision.children_stats:
+            print(f"root -> {stat['action']['action']} | backed_up_value={stat['backed_up_value']}")
+            for gc in stat.get("grandchildren", []):
+                print(f"    -> {gc['action']['action']} | value={gc['value']}")
     finally:
         close_scorecard(session, card_id)
         print("Scorecard closed!")
