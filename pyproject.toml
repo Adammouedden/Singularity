@@ -6,6 +6,11 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "arc-agi>=0.9.6",
+    "einops>=0.8.2",
+    "flash-attn",
     "psutil>=7.2.2",
     "torch>=2.11.0",
 ]
+
+[tool.uv.extra-build-dependencies]
+flash-attn = ["torch"]
