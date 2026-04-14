@@ -59,7 +59,7 @@ def main():
         "Accept": "application/json",
     })
 
-    game_id = get_random_game_id(session) # "ls20-9607627b" 
+    game_id = "ls20-9607627b"  #get_random_game_id(session)
     card_id = open_scorecard(session)
 
     print(f"Selected game_id: {game_id}")

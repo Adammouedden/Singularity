@@ -200,6 +200,38 @@ class ShallowMCTS:
 
         return critic_score + terminal_bonus + env_bonus
 
+    def _rollout(
+    self,
+    start_state: EnvState,
+    base_action_sequence: List[ActionCandidate],
+    max_steps: int = 2,
+    ) -> EnvState:
+        """
+        Simulate forward from an already-materialized state by repeatedly:
+        1. proposing actions for the current rollout state
+        2. choosing the top-ranked action
+        3. replaying the full sequence from root
+
+        Returns the final rollout EnvState.
+        """
+        current_state = start_state
+        current_sequence = list(base_action_sequence)
+
+        for _ in range(max_steps):
+            if current_state.state in ["WIN", "GAME_OVER"]:
+                break
+
+            ranked = self._rank_actions_for_state(current_state)
+            if not ranked:
+                break
+
+            action = ranked[0][0]  # greedy rollout for now
+            current_sequence.append(action)
+
+            current_state = self.env.replay_sequence(current_sequence)
+
+        return current_state
+
     def _expand(self, node: MCTSNode) -> Tuple[MCTSNode, float]:
         self._ensure_candidates(node)
 
@@ -214,12 +246,6 @@ class ShallowMCTS:
         chosen_action = None
         chosen_score = None
 
-        if len(node.candidate_actions) != len(node.candidate_scores):
-            raise ValueError(
-                f"Candidate action/score mismatch on node {node.node_id}: "
-                f"{len(node.candidate_actions)} actions vs {len(node.candidate_scores)} scores"
-            )
-        
         for action, score in zip(node.candidate_actions, node.candidate_scores):
             key = self._action_key(action)
             if key not in node.expanded_action_keys:
@@ -229,23 +255,31 @@ class ShallowMCTS:
                 break
 
         if chosen_action is None or chosen_score is None:
-                raise ValueError(
+            raise ValueError(
                 f"Failed to find an unexpanded action. "
                 f"node_id={node.node_id}, "
                 f"candidate_keys={[self._action_key(a) for a in node.candidate_actions]}, "
                 f"expanded_keys={node.expanded_action_keys}"
             )
 
-        child_state = self.env.replay_sequence(node.action_sequence + [chosen_action])
+        child_sequence = node.action_sequence + [chosen_action]
+        child_state = self.env.replay_sequence(child_sequence)
+
         child_node = self._make_child_node(
             parent=node,
             action=chosen_action,
             child_state=child_state,
         )
 
+        rollout_state = self._rollout(
+            start_state=child_state,
+            base_action_sequence=child_sequence,
+            max_steps=2,
+        )
+
         leaf_value = self._score_materialized_state(
             parent_state=node.state,
-            child_state=child_state,
+            child_state=rollout_state,
             critic_score=chosen_score,
         )
 
