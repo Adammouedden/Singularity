@@ -14,3 +14,6 @@ dependencies = [
 
 [tool.uv.extra-build-dependencies]
 flash-attn = ["torch"]
+
+[tool.uv.sources]
+transformers = { path = "libs/transformers", editable = true }

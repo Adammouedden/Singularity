@@ -7,6 +7,7 @@ from torch import nn
 from pydantic import BaseModel
 from common import trunc_normal_init_
 from layers import rms_norm, ConvSwiGLU, Attention, RotaryEmbedding, CosSin, CastedEmbedding, CastedLinear
+from sparse_embedding import CastedSparseEmbedding
 
 
 @dataclass
@@ -93,11 +94,20 @@ class URM_Inner(nn.Module):
         )
         self.lm_head = CastedLinear(self.config.hidden_size, self.config.vocab_size, bias=False)
         self.q_head = CastedLinear(self.config.hidden_size, 2, bias=True)
+        self.puzzle_emb_len = -(self.config.puzzle_emb_ndim // -self.config.hidden_size)
 
+        if self.config.puzzle_emb_ndim > 0:
+            self.puzzle_emb = CastedSparseEmbedding(
+                self.config.num_puzzle_identifiers,
+                self.config.puzzle_emb_ndim,
+                batch_size=self.config.batch_size,
+                init_std=0,
+                cast_to=self.forward_dtype,
+            )
 
         self.rotary_emb = RotaryEmbedding(
             dim=self.config.hidden_size // self.config.num_heads,
-            max_position_embeddings=self.config.seq_len,
+            max_position_embeddings=self.config.seq_len + self.puzzle_emb_len,
             base=self.config.rope_theta,
         )
 
