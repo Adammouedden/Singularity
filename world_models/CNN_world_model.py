@@ -2,8 +2,6 @@ import random
 import time
 from typing import Any
 import numpy as np
-import sys
-import os
 import logging
 import torch
 import torch.nn as nn
@@ -11,8 +9,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from collections import deque
 import hashlib
-from schemas.schemas import CandidateActions, ActionCandidate
-from agents.structs import FrameData, GameAction, GameState
+from schemas.schemas import CandidateActions, ActionCandidate, EnvState
 
 """
 Action Learner - Learns to predict which actions cause frame changes for efficient exploration.
@@ -95,7 +92,7 @@ class ActionModel(nn.Module):
 
 
 class CNNWorldModel():
-    """Agent using action model to predict which actions lead to new frames."""
+    """Predict which actions lead to new frames."""
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         seed = int(time.time() * 1000000) + hash(self.game_id) % 1000000
@@ -129,14 +126,11 @@ class CNNWorldModel():
         self.batch_size = 64
         # TODO: Update this to a smaller value?
         self.train_frequency = 5  # Train every N actions
+        self.action_counter = 0
         
         # Track previous state/action for experience creation
         self.prev_frame = None
         self.prev_action_idx = None
-        
-        # Action mapping: ACTION1-ACTION5
-        self.action_list = [GameAction.ACTION1, GameAction.ACTION2, GameAction.ACTION3, 
-                           GameAction.ACTION4, GameAction.ACTION5]
         
         # Action semantics for proposer
         self.action_semantics = {
@@ -153,27 +147,73 @@ class CNNWorldModel():
         self.logger.info(f"Action agent initialized for game_id: {self.game_id}")
 
     def propose_actions(
-        self, frame: FrameData, available_actions: list
+        self, frame: EnvState, actions: list
     ) -> CandidateActions:
         """
         Generate ranked candidate actions from CNN predictions.
         
         Args:
-            frame: Current FrameData object
-            available_actions: List of ActionCandidate objects representing available actions
+            frame: Current EnvState object
+            actions: List of ints representing actions
             
         Returns:
             CandidateActions: Ranked list of candidate next actions with probabilities
         """
         # get the action names
-        available_action_strings = {ac.action for ac in available_actions}
+        available_action_strings = {
+            f"ACTION{a}"
+            for a in actions
+            if f"ACTION{a}" in self.action_semantics
+        }
         
         # Force ACTION7 to have 0 probability by excluding it from available set
         # (ACTION7 is not in CNN output, but we explicitly ensure it in the filtering)
         available_action_strings.discard("ACTION7")
+
+        # check if score has changed
+        if frame.score != self.current_score:
+            # Clear experience buffer when reaching new level
+            self.experience_buffer.clear()
+            self.experience_hashes.clear()
+
+            # Reset network and optimizer for new level
+            # TODO: Try not resetting the networks here. Perhaps it performs even better.
+            self.action_model = ActionModel(input_channels=self.num_colours, grid_size=self.grid_size).to(self.device)
+            self.optimizer = optim.Adam(self.action_model.parameters(), lr=0.0001)
+            self.logger.info(f"Reset action model and optimizer for new level")
+            print("Reset action model and optimizer for new level")
+
+            # Reset previous tracking
+            self.prev_frame = None
+            self.prev_action_idx = None
+
+            self.current_score = frame.score
+
+        if frame.state == "GAME_OVER":
+            # Reset previous tracking on game reset
+            self.prev_frame = None
+            self.prev_action_idx = None
+            return CandidateActions(candidates=[]) # TODO: Figure out how to handle this consistently throughout 
         
         # Convert frame to tensor
-        current_frame = self._frame_to_tensor(frame)
+        current_frame = self._frame_to_tensor(frame.frame)
+
+        # If frame processing failed, return original available actions
+        if current_frame is None:
+            self.prev_frame = None
+            self.prev_action_idx = None
+
+            fallback_candidates = []
+            for action_id in actions[:3]:
+                action_name = f"ACTION{action_id}"
+                if action_name in self.action_semantics:
+                    fallback_candidates.append(
+                        ActionCandidate(
+                            action=action_name,
+                            rationale="fallback candidate"
+                        )
+                    )
+            return CandidateActions(candidates=fallback_candidates)
         
         # Get CNN predictions -> first 5 are probability for actions, sixth one is coordinates for action 6
         # uses frame to return probability each action has to lead to frame change
@@ -188,6 +228,8 @@ class CNNWorldModel():
             # Convert logits to probabilities using sigmoid
             action_probs = torch.sigmoid(action_logits).cpu().numpy()  # Shape: (5,)
             coord_probs = torch.sigmoid(coord_logits).cpu().numpy()    # Shape: (4096,)
+
+            # TODO: for fair sampling why not treat coords as one action
         
         # Build list of candidate actions with scores
         candidates_with_scores = []
@@ -220,7 +262,7 @@ class CNNWorldModel():
                 x = coord_idx % self.grid_size
                 
                 candidate = {
-                    'action': ActionCandidate( # actual candidation obj
+                    'action': ActionCandidate( # actual candidate obj
                         action="ACTION6",
                         x=x,
                         y=y,
@@ -242,6 +284,52 @@ class CNNWorldModel():
             result_candidates = [candidates_with_scores[0]['action']]
         
         return CandidateActions(candidates=result_candidates)
+    
+
+    def observe_action(self, prev_state: EnvState, action: ActionCandidate, next_state: EnvState) -> None:
+        """
+        Handles experience management to train CNN at inference time
+
+        Call this function AFTER decision has been commited to live game
+
+        proposer.observe_action(prev_state=root_state, action=decision.best_action, next_state=next_state)
+        """
+        prev_tensor = self._frame_to_tensor(prev_state.frame)
+        next_tensor = self._frame_to_tensor(next_state.frame)
+
+        prev_np = prev_tensor.cpu().numpy().astype(bool)
+        next_np = next_tensor.cpu().numpy().astype(bool)
+
+        # Map executed action to unified action index
+        coord_idx = None
+        if action.action == "ACTION6":
+            if action.x is None or action.y is None:
+                raise ValueError("ACTION6 requires both x and y.")
+            coord_idx = int(action.y) * self.grid_size + int(action.x)
+            action_idx = 5 + coord_idx
+        else:
+            # ACTION1..ACTION5 -> 0..4
+            # TODO: action7 is never taken by CNN but should guard against it
+            action_idx = int(action.action.replace("ACTION", "")) - 1
+
+        experience_hash = self._compute_experience_hash(prev_np, action_idx)
+        if experience_hash not in self.experience_hashes:
+            frame_changed = not np.array_equal(prev_np, next_np)
+            experience = {
+                    'state': prev_np,  # Already numpy bool
+                    'action_idx': action_idx,  # Unified action index
+                    'reward': 1.0 if frame_changed else 0.0 # frame changed, positive reward
+                }
+            self.experience_buffer.append(experience)
+            self.experience_hashes.add(experience_hash)
+
+        # Keep latest observed transition context
+        self.prev_frame = next_np
+        self.prev_action_idx = action_idx
+
+        self.action_counter += 1
+        if self.action_counter % self.train_frequency == 0:
+            self._train_action_model()
 
     def _sample_from_combined_output(self, combined_logits: torch.Tensor, available_actions: list[int] = None) -> tuple[int, int, int, np.ndarray]:
         """Sample from combined 5 + 64x64 action space with masking for invalid actions."""
@@ -302,13 +390,10 @@ class CNNWorldModel():
             x_idx = coord_idx % self.grid_size
             return 5, (y_idx, x_idx), coord_idx, all_probs_viz_np
 
-    def _frame_to_tensor(self, frame_data: FrameData) -> torch.Tensor:
+    def _frame_to_tensor(self, frame) -> torch.Tensor:
         """Convert frame data to tensor format for the model."""
         # Convert frame to numpy array with color indices 0-15
-        frame = np.array(frame_data.frame, dtype=np.int64)
-        
-        # Take the last frame (in case of an animation of frames)
-        frame = frame[-1]
+        frame = np.array(frame, dtype=np.int64)
         
         assert frame.shape == (self.grid_size, self.grid_size)
         
@@ -375,126 +460,3 @@ class CNNWorldModel():
         
         # Clean up GPU memory
         torch.cuda.empty_cache() if torch.cuda.is_available() else None
-
-    def _has_time_elapsed(self) -> bool:
-        """Check if 8 hours have elapsed since start."""
-        elapsed_hours = time.time() - self.start_time
-        return elapsed_hours >= 8 * 3600 - 5 * 60 # 8 hours with a 5 minute safety buffer.
-
-    def is_done(self, frames: list[FrameData], latest_frame: FrameData) -> bool:
-        """Decide if the agent is done playing or not."""
-        return any([
-            latest_frame.state is GameState.WIN,
-            self._has_time_elapsed(),
-        ])
-
-    def choose_action(
-        self, frames: list[FrameData], latest_frame: FrameData
-    ) -> GameAction:
-
-        """Choose action using action model predictions."""
-        # Check if score has changed and log score at action count
-        if latest_frame.score != self.current_score:
-            self.logger.info(f"Score changed from {self.current_score} to {latest_frame.score} at action {self.action_counter}")
-            print(f"Score changed from {self.current_score} to {latest_frame.score} at action {self.action_counter}")
-            
-            # Clear experience buffer when reaching new level
-            self.experience_buffer.clear()
-            self.experience_hashes.clear()
-            self.logger.info(f"Cleared experience buffer - new level reached")
-            print("Cleared experience buffer - new level reached")
-            
-            self.logger.info(f"Reset entropy scheduler for new level - starting with high exploration")
-            print("Reset entropy scheduler for new level - starting with high exploration")
-            
-            # Reset network and optimizer for new level
-            # TODO: Try not resetting the networks here. Perhaps it performs even better.
-            self.action_model = ActionModel(input_channels=self.num_colours, grid_size=self.grid_size).to(self.device)
-            self.optimizer = optim.Adam(self.action_model.parameters(), lr=0.0001)
-            self.logger.info(f"Reset action model and optimizer for new level")
-            print("Reset action model and optimizer for new level")
-            
-            # Reset previous tracking
-            self.prev_frame = None
-            self.prev_action_idx = None
-            
-            
-            self.current_score = latest_frame.score
-        
-        if latest_frame.state in [GameState.NOT_PLAYED, GameState.GAME_OVER]:
-            # Reset previous tracking on game reset
-            self.prev_frame = None
-            self.prev_action_idx = None
-            action = GameAction.RESET
-            action.reasoning = "Game needs reset."
-            return action
-
-
-        # Convert current frame to tensor
-        current_frame = self._frame_to_tensor(latest_frame)
-        
-        # If frame processing failed, reset tracking and return random action
-        if current_frame is None:
-            print("Error detected!")
-            self.prev_frame = None
-            self.prev_action_idx = None
-            
-            action = random.choice(self.action_list[:5])  # Random ACTION1-ACTION5
-            action.reasoning = f"Skipped weird frame, random {action.value}"
-            return action
-        
-        # Create experience from previous action if we have previous data
-        if self.prev_frame is not None:
-            # Compute hash for uniqueness check
-            experience_hash = self._compute_experience_hash(self.prev_frame, self.prev_action_idx)
-            
-            # Only store if unique
-            if experience_hash not in self.experience_hashes:
-                # Convert current frame to numpy bool for comparison
-                current_frame_np = current_frame.cpu().numpy().astype(bool)
-                frame_changed = not np.array_equal(self.prev_frame, current_frame_np)
-                # if frame_changed:
-                    # print(f"Action: {self.prev_action_idx} got a new positive reward!")
-                experience = {
-                    'state': self.prev_frame,  # Already numpy bool
-                    'action_idx': self.prev_action_idx,  # Unified action index
-                    'reward': 1.0 if frame_changed else 0.0
-                }
-                self.experience_buffer.append(experience)
-                self.experience_hashes.add(experience_hash)
-                
-        # Get action predictions from action model
-        with torch.no_grad():
-            combined_logits = self.action_model(current_frame.unsqueeze(0))
-            combined_logits = combined_logits.squeeze(0)  # (5 + 4096,)
-            
-            # Sample from combined action space
-            action_idx, coords, coord_idx, all_probs = self._sample_from_combined_output(combined_logits, latest_frame.available_actions)
-            
-            if action_idx < 5:
-                # Selected ACTION1-ACTION5
-                selected_action = self.action_list[action_idx]
-                selected_action.reasoning = f"{selected_action.name} (prob: {all_probs[action_idx]:.3f})"
-            else:
-                # Selected a coordinate - treat as ACTION6
-                selected_action = GameAction.ACTION6
-                y, x = coords
-                selected_action.set_data({"x": x, "y": y})
-                selected_action.reasoning = f"ACTION6 at ({x}, {y}) (prob: {all_probs[coord_idx]:.3f})"
-                
-        
-        # Store current frame and action for next experience creation
-        self.prev_frame = current_frame.cpu().numpy().astype(bool)
-        # Store unified action index: 0-4 for ACTION1-5, 5+ for coordinates
-        if action_idx < 5:
-            self.prev_action_idx = action_idx
-        else:
-            self.prev_action_idx = 5 + coord_idx  # Unified action space
-        
-        
-        # Train model periodically
-        if self.action_counter % self.train_frequency == 0:
-            self._train_action_model()
-        
-        
-        return selected_action
