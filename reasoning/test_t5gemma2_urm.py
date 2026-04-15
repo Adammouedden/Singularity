@@ -25,7 +25,7 @@ from modeling_t5gemma2_urm import T5Gemma2WithURMForConditionalGeneration
 
 # ── Dimensions ───────────────────────────────────────────────────────────────
 # H must be identical for encoder, decoder, AND URM — no projections.
-H      = 64
+H      = 640
 VOCAB  = 256
 B      = 2    # batch size
 S_ENC  = 8    # encoder sequence length

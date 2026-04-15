@@ -20,13 +20,16 @@ from transformers.models.t5gemma2.modeling_t5gemma2 import (
 from transformers.modeling_outputs import Seq2SeqModelOutput
 from urm.URM import URMConfig
 from urm_bridge import URMBridge
+from scaffold_Singularis import encoder, decoder
 
 
 class T5Gemma2WithURMModel(T5Gemma2Model):
 
     def __init__(self, config, urm_config: URMConfig):
         super().__init__(config)
+        self.encoder = encoder
         self.urm_bridge = URMBridge(urm_config)
+        self.decoder = decoder
 
     def forward(
         self,

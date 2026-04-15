@@ -8,12 +8,21 @@ dependencies = [
     "arc-agi>=0.9.6",
     "einops>=0.8.2",
     "flash-attn",
+    "huggingface-hub>=1.10.2",
     "psutil>=7.2.2",
+    "regex>=2026.4.4",
+    "safetensors>=0.7.0",
     "torch>=2.11.0",
+    "transformers", # Add this so uv knows to link the source below
 ]
+
+[tool.uv.sources]
+transformers = { path = "./libs/transformers", editable = true }
 
 [tool.uv.extra-build-dependencies]
 flash-attn = ["torch"]
 
-[tool.uv.sources]
-transformers = { path = "libs/transformers", editable = true }
+[tool.setuptools]
+# This prevents the "Multiple top-level packages discovered" error.
+# It tells uv/setuptools: "Don't look for code to install in the root."
+packages = []

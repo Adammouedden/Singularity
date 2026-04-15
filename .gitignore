@@ -1,3 +1,4 @@
 /examples
 .venv/
 .python-version
+/reasoning/model.safetensors
