@@ -56,24 +56,9 @@ class URMBlock(nn.Module):
 
     def forward(self, cos_sin: CosSin, hidden_states: torch.Tensor) -> torch.Tensor:
         attn_output = self.self_attn(cos_sin=cos_sin, hidden_states=hidden_states)
-        print("===" * 50)
-        print("Debugging!!!")
-        
-        print("Attention Output:")
-        print(attn_output)
-        
         hidden_states = rms_norm(hidden_states + attn_output, variance_epsilon=self.norm_eps)
-        print("Hidden State:")
-        print(hidden_states)
-        
         mlp_output = self.mlp(hidden_states)
-        print("MLP Output:")
-        print(mlp_output)
-        
         hidden_states = rms_norm(hidden_states + mlp_output, variance_epsilon=self.norm_eps)
-        print("Hidden State:")
-        print(hidden_states)
-        
         return hidden_states
 
 
@@ -107,6 +92,9 @@ class URM_Inner(nn.Module):
             trunc_normal_init_(torch.empty(self.config.hidden_size, dtype=self.forward_dtype), std=1),
             persistent=True,
         )
+
+        # puzzle_emb_len is 0 when puzzle_emb_ndim == 0 (no puzzle prefix tokens)
+        self.puzzle_emb_len = 0
 
         with torch.no_grad():
             self.q_head.weight.zero_()
@@ -147,12 +135,25 @@ class URM_Inner(nn.Module):
     def forward(
         self,
         carry: URMCarry,
-        batch: Dict[str, torch.Tensor]
+        batch: Dict[str, torch.Tensor],
+        input_hidden_states: Optional[torch.Tensor] = None,
     ) -> Tuple[URMCarry, torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
-        seq_info = dict(cos_sin=self.rotary_emb())
-        input_embeddings = self._input_embeddings(batch["inputs"], batch["puzzle_identifiers"])
+        # Slice RoPE to the actual sequence length so shapes always match,
+        # regardless of what seq_len was set to in URMConfig.
+        cos_full, sin_full = self.rotary_emb()
+        actual_seq_len = input_embeddings.shape[1]
+        seq_info = dict(cos_sin=(cos_full[:actual_seq_len], sin_full[:actual_seq_len]))
+
+        ## if there are external embeddings, skip internal embeddings
+        if input_hidden_states is not None:
+            input_embeddings = input_hidden_states.to(self.forward_dtype)
+        else:
+            input_embeddings = self._input_embeddings(batch["inputs"], batch["puzzle_identifiers"])
+        
 
         hidden_states = carry.current_hidden
+
+
         if self.config.H_cycles > 1:
             with torch.no_grad():
                 for _ in range(self.config.H_cycles - 1):
@@ -196,9 +197,10 @@ class URM(nn.Module):
         self,
         carry: URMCarry,
         batch: Dict[str, torch.Tensor],
+        input_hidden_states=None,
         compute_target_q=False
     ) -> Tuple[URMCarry, Dict[str, torch.Tensor]]:
-
+        
         new_carry = self.inner.reset_carry(carry.halted, carry)
         new_steps = torch.where(carry.halted, 0, carry.steps)
         new_current_data = {
@@ -210,7 +212,10 @@ class URM(nn.Module):
             for k, v in carry.current_data.items()
         }
 
-        new_carry, logits, (q_halt_logits, q_continue_logits) = self.inner(new_carry, new_current_data)
+        new_carry, logits, (q_halt_logits, q_continue_logits) = self.inner(
+            new_carry, new_current_data,
+            input_hidden_states=input_hidden_states
+        )
 
         outputs = {
             "logits": logits,
@@ -240,6 +245,4 @@ class URM(nn.Module):
             outputs,
         )
         
-
-
-    
+ 
