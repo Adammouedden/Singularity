@@ -1,7 +1,7 @@
 import torch
 from urm.URM import URM, URMCarry
 
-device = torch.device("cuda")
+device = torch.device("cuda" if torch.cuda_is.available() else "cpu")
 
 #Replicated config from the URM paper
 config_dict = {

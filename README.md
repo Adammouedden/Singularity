@@ -16,7 +16,7 @@ It is slower than raw python execution ```python 3 <filename>``` but it ensures 
 ``` uvx pipreqs . --force ``` is a command to traverse your codebase and create a ```requirements.txt``` file with all python imports
 ``` uv add -r requirements.txt``` is the command to append or create the ```uv.lock``` file
 
-### Developer pipeline:
+## Developer pipeline:
 
 0. ```git pull / git clone```
 - optional: ```uv sync``, step 1 handles this automatically
