@@ -12,6 +12,7 @@ from transformers.models.t5gemma2.configuration_t5gemma2 import (T5Gemma2Config,
 from transformers.models.siglip import SiglipVisionConfig
 from reasoning.urm.URM import URMConfig
 from reasoning.singularis.model import SingularisForConditionalGeneration
+from reasoning.singularis.config_and_weights import LLM_config, encoder_weights, decoder_weights, URM_config
 
 # ── Dimensions ───────────────────────────────────────────────────────────────
 # H must be identical for encoder, decoder, AND URM — no projections.
@@ -62,21 +63,8 @@ print(f"    decoder hidden_size : {t5_cfg.decoder.hidden_size}")
 # ── Build URM config ──────────────────────────────────────────────────────────
 print("\n[2/4] Building URM config...")
 
-urm_cfg = URMConfig(
-    batch_size=B,
-    seq_len=64,              # max RoPE positions — actual seq is sliced at runtime
-    puzzle_emb_ndim=0,       # no puzzle embeddings
-    num_puzzle_identifiers=1,
-    vocab_size=1,            # unused: we bypass the URM's embedding table
-    num_layers=2,
-    hidden_size=H,           # MUST match T5Gemma2 hidden_size
-    expansion=2.0,
-    num_heads=4,
-    pos_encodings="rope",
-    loops=2,
-    L_cycles=1,
-    H_cycles=1,
-)
+urm_cfg = URM_config
+
 print(f"    hidden_size : {urm_cfg.hidden_size}  (matches T5: {urm_cfg.hidden_size == H})")
 print(f"    loops       : {urm_cfg.loops}, L_cycles={urm_cfg.L_cycles}")
 
@@ -85,7 +73,7 @@ print("\n[3/4] Building SingularisForConditionalGeneration...")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"    device : {device}")
 
-model = SingularisForConditionalGeneration(t5_cfg, urm_cfg).to(device).eval()
+model = SingularisForConditionalGeneration(urm_cfg, LLM_config).to(device).eval()
 
 total_params = sum(p.numel() for p in model.parameters())
 enc_params   = sum(p.numel() for p in model.model.encoder.parameters())

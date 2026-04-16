@@ -2,14 +2,17 @@ from transformers.models.t5gemma2.modeling_t5gemma2 import (T5Gemma2Model, T5Gem
 from transformers.modeling_outputs import Seq2SeqModelOutput
 from reasoning.urm.URM import URMConfig
 from reasoning.singularis.urm_bridge import URMBridge
+import torch
 
 
 class Singularis(T5Gemma2Model):
-    def __init__(self, config, urm_config: URMConfig, LLM_config: T5Gemma2Config):
-        super().__init__(config)
-        self.encoder = T5Gemma2Encoder(LLM_config.encoder)
+    def __init__(self, urm_config: URMConfig, LLM_config: T5Gemma2Config):
+        super().__init__(LLM_config)
+        
+        self.encoder = T5Gemma2Encoder._from_config(LLM_config.encoder)
         self.urm_bridge = URMBridge(urm_config)
-        self.decoder = T5Gemma2Decoder(LLM_config.decoder)
+        self.decoder = T5Gemma2Decoder._from_config(LLM_config.decoder)
+
 
     def forward(
         self,
@@ -69,6 +72,8 @@ class Singularis(T5Gemma2Model):
             encoder_hidden_states=encoder_outputs.hidden_states,
             encoder_attentions=encoder_outputs.attentions,
         )
+        
+
     
 
 
@@ -78,10 +83,18 @@ class SingularisForConditionalGeneration(T5Gemma2ForConditionalGeneration):
     reasoning module inserted between the encoder and decoder.
     """
 
-    def __init__(self, config, urm_config: URMConfig):
-        super().__init__(config)
+    def __init__(self, urm_config: URMConfig, LLM_config: T5Gemma2Config,):
+        super().__init__(LLM_config)
         # Replace the base model with the URM-augmented version, then retie
         # weights so lm_head.out_proj points to the new model's embed_tokens
         # (super().__init__ tied them to the first temporary T5Gemma2Model).
-        self.model = Singularis(config, urm_config)
+        self.model = Singularis(urm_config, LLM_config)
         self.tie_weights()
+    
+    def load_weights(self, encoder_weights, decoder_weights):
+        self.model.encoder.load_state_dict(encoder_weights)
+        self.model.decoder.load_state_dict(decoder_weights)
+        
+        
+        
+    

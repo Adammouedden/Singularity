@@ -8,21 +8,21 @@ from reasoning.urm.URM import URMConfig
 import torch
 
 
+
 #Load the config
 with open("reasoning/singularis/configs/t5gemma2_270M_config.json") as f:
     data = json.load(f)
 
-config = T5Gemma2Config.from_dict(data)
-encoder = T5Gemma2Encoder(config.encoder)
-decoder = T5Gemma2Decoder(config.decoder)
+LLM_config = T5Gemma2Config.from_dict(data)
+
 
 # Utilize the T5Gemma2Config to create the URM config
-urm_config = URMConfig(
+URM_config = URMConfig(
     batch_size=32, #match URM paper
     seq_len=512, #match URM paper
     puzzle_emb_ndim=0, #Not needed
     num_puzzle_identifiers=0, #Not needed
-    vocab_size=data["vocab_size"], #match encoder/decoder
+    vocab_size=1, #data["vocab_size"], #match encoder/decoder
     num_layers=4, #match URM paper
     hidden_size=data["decoder"]["hidden_size"], #match encoder/decoder
     expansion=4.0, #SwiGLU standard expansion
@@ -38,20 +38,43 @@ urm_config = URMConfig(
     forward_dtype="bfloat16" 
 )
 
-
 #Load the weights
 state_dict = load_file("reasoning/singularis/weights/model.safetensors")
 
-encoder_sd = {k[len("model.encoder."):]: v for k, v in state_dict.items() if k.startswith("model.encoder.")}
-decoder_sd = {k[len("model.decoder."):]: v for k, v in state_dict.items() if k.startswith("model.decoder.")}
+_raw_encoder_weights = {k[len("model.encoder."):]: v for k, v in state_dict.items() if k.startswith("model.encoder.")}
 
-encoder.load_state_dict(encoder_sd, strict=False)
-decoder.load_state_dict(decoder_sd, strict=False)
+encoder_weights = {}
+for k, v in _raw_encoder_weights.items():
+    if k.startswith("vision_tower.vision_model."):
+        new_k = k.replace("vision_tower.vision_model.", "vision_tower.", 1)
+    elif not k.startswith("vision_tower.") and not k.startswith("multi_modal_projector."):
+        new_k = "text_model." + k
+    else:
+        new_k = k
+    encoder_weights[new_k] = v
 
-decoder = decoder.to(torch.bfloat16)
-encoder = encoder.to(torch.bfloat16)
+decoder_weights = {k[len("model.decoder."):]: v for k, v in state_dict.items() if k.startswith("model.decoder.")}
+
+# embed_tokens are tied (stored once under encoder); copy them to decoder if absent
+for suffix in ("embed_tokens.weight", "embed_tokens.eoi_embedding"):
+    if suffix not in decoder_weights:
+        src_key = "model.encoder." + suffix
+        if src_key in state_dict:
+            decoder_weights[suffix] = state_dict[src_key]
+
 
 if __name__ == "__main__":
+    
+    encoder = T5Gemma2Encoder(LLM_config.encoder)
+    decoder = T5Gemma2Decoder(LLM_config.decoder)
+    
+    encoder.load_state_dict(encoder_weights, strict=False)
+    decoder.load_state_dict(decoder_weights, strict=False)
+
+    decoder = decoder.to(torch.bfloat16)
+    encoder = encoder.to(torch.bfloat16)
+    
+    
     print(state_dict)
 
     # From config:
