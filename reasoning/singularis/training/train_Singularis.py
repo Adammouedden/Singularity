@@ -6,6 +6,7 @@ import os
 import time
 import torch
 import torch.nn as nn
+import wandb
 
 # Hyperparameters
 LR      = 1e-3
@@ -14,6 +15,22 @@ PATIENCE = 7
 CHECKPOINT_DIR = "checkpoints"
 
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
+
+wandb.init(
+    project="singularis",
+    name="singularis-training-run-1",
+    config={
+        "lr": LR,
+        "epochs": EPOCHS,
+        "patience": PATIENCE,
+        "batch_size": 16,
+        "max_length": 256,
+        "optimizer": "AdamW",
+        "datasets": ["gsm8k", "arc-easy", "arc-challenge"],
+        "frozen": ["encoder", "decoder"],
+        "trainable": ["urm_bridge"],
+    },
+)
 
 # Model
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -74,6 +91,7 @@ def run_epoch(loader, train=True):
                 optimizer.step()
                 if step % 100 == 0:
                     print(f"  Step {step:>4} | Loss: {loss.item():.4f}")
+                wandb.log({"train/step_loss": loss.item()})
 
             total_loss += loss.item()
 
@@ -95,6 +113,13 @@ for epoch in range(EPOCHS):
     elapsed = time.time() - t0
     print(f"  Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Time: {elapsed:.1f}s")
 
+    wandb.log({
+        "epoch": epoch + 1,
+        "train/epoch_loss": train_loss,
+        "val/epoch_loss": val_loss,
+        "epoch_time_s": elapsed,
+    })
+
     if val_loss < best_val_loss:
         best_val_loss    = val_loss
         patience_counter = 0
@@ -103,6 +128,7 @@ for epoch in range(EPOCHS):
             os.path.join(CHECKPOINT_DIR, "urm_best.pt"),
         )
         print(f"  Saved best model (val_loss={val_loss:.4f})")
+        wandb.summary["best_val_loss"] = best_val_loss
     else:
         patience_counter += 1
         print(f"  No improvement ({patience_counter}/{PATIENCE})")
@@ -111,3 +137,4 @@ for epoch in range(EPOCHS):
             break
 
 print(f"\nTraining complete. Best val loss: {best_val_loss:.4f}")
+wandb.finish()

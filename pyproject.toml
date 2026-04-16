@@ -16,6 +16,7 @@ dependencies = [
     "safetensors>=0.7.0",
     "torch>=2.11.0",
     "transformers", # Add this so uv knows to link the source below
+    "wandb>=0.26.0",
 ]
 
 [tool.uv.sources]
