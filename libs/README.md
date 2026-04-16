@@ -13,7 +13,7 @@ For first time cloning of the Singularity repo, run the following command:
 
 For those who already have Singularity cloned but have never initialized the submodule, run the following:
 ```git pull```
-```git submodule update --init --recursive```https://github.com/Adammouedden/Singularity/tree/latentreasoner
+```git submodule update --init --recursive```
 
 For those who already have Singularity cloned and have already initialized the submodule:
 ```git pull --recurse-submodules```
