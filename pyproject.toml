@@ -6,9 +6,11 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "arc-agi>=0.9.6",
+    "datasets>=4.8.4",
     "einops>=0.8.2",
     "flash-attn",
     "huggingface-hub>=1.10.2",
+    "peft>=0.19.0",
     "psutil>=7.2.2",
     "regex>=2026.4.4",
     "safetensors>=0.7.0",

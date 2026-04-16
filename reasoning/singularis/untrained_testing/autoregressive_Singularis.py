@@ -32,6 +32,8 @@ with torch.no_grad():
         max_new_tokens=50,
         do_sample=False,    # greedy decoding
     )
+    
+    #print(generated_ids)
 
 response = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 print(f"Output : {response!r}")

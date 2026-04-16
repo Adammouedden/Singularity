@@ -88,12 +88,12 @@ class SingularisForConditionalGeneration(T5Gemma2ForConditionalGeneration):
         # Replace the base model with the URM-augmented version, then retie
         # weights so lm_head.out_proj points to the new model's embed_tokens
         # (super().__init__ tied them to the first temporary T5Gemma2Model).
-        self.model = Singularis(urm_config, LLM_config)
+        self.singularis = Singularis(urm_config, LLM_config)
         self.tie_weights()
     
     def load_weights(self, encoder_weights, decoder_weights):
-        self.model.encoder.load_state_dict(encoder_weights)
-        self.model.decoder.load_state_dict(decoder_weights)
+        self.singularis.encoder.load_state_dict(encoder_weights)
+        self.singularis.decoder.load_state_dict(decoder_weights)
         
         
         
