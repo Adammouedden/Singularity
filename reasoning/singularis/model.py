@@ -1,18 +1,15 @@
-from transformers.models.t5gemma2.modeling_t5gemma2 import (T5Gemma2Model, T5Gemma2ForConditionalGeneration)
+from transformers.models.t5gemma2.modeling_t5gemma2 import (T5Gemma2Model, T5Gemma2ForConditionalGeneration, T5Gemma2Config, T5Gemma2Encoder, T5Gemma2Decoder)
 from transformers.modeling_outputs import Seq2SeqModelOutput
 from reasoning.urm.URM import URMConfig
 from reasoning.singularis.urm_bridge import URMBridge
 
-from reasoning.singularis.config_and_weights import encoder, decoder
-
 
 class Singularis(T5Gemma2Model):
-
-    def __init__(self, config, urm_config: URMConfig):
+    def __init__(self, config, urm_config: URMConfig, LLM_config: T5Gemma2Config):
         super().__init__(config)
-        self.encoder = encoder
+        self.encoder = T5Gemma2Encoder(LLM_config.encoder)
         self.urm_bridge = URMBridge(urm_config)
-        self.decoder = decoder
+        self.decoder = T5Gemma2Decoder(LLM_config.decoder)
 
     def forward(
         self,

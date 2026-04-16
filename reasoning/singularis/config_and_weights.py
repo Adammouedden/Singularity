@@ -4,20 +4,43 @@ from transformers.models.gemma3.modeling_gemma3 import Gemma3RotaryEmbedding
 import json
 from safetensors.torch import load_file
 from transformers.models.t5gemma2.modeling_t5gemma2 import T5Gemma2Encoder, T5Gemma2Decoder
+from reasoning.urm.URM import URMConfig
 import torch
 
-state_dict = load_file("reasoning/singularis/model.safetensors")
-#print(state_dict)
 
-
-with open("libs/transformers/src/transformers/models/t5gemma2/config.json") as f:
+#Load the config
+with open("reasoning/singularis/configs/t5gemma2_270M_config.json") as f:
     data = json.load(f)
 
 config = T5Gemma2Config.from_dict(data)
-
-
 encoder = T5Gemma2Encoder(config.encoder)
 decoder = T5Gemma2Decoder(config.decoder)
+
+# Utilize the T5Gemma2Config to create the URM config
+urm_config = URMConfig(
+    batch_size=32, #match URM paper
+    seq_len=512, #match URM paper
+    puzzle_emb_ndim=0, #Not needed
+    num_puzzle_identifiers=0, #Not needed
+    vocab_size=data["vocab_size"], #match encoder/decoder
+    num_layers=4, #match URM paper
+    hidden_size=data["decoder"]["hidden_size"], #match encoder/decoder
+    expansion=4.0, #SwiGLU standard expansion
+    num_heads=8, #match URM paper
+    pos_encodings="sinusoidal", #match URM paper
+    attn_dropout=0.0,
+    mlp_dropout=0.0,
+    rms_norm_eps=1e-5,
+    rope_theta=10000.0,
+    loops=16, #match URM paper
+    L_cycles=8, #match URM paper
+    H_cycles=2, #match URM paper
+    forward_dtype="bfloat16" 
+)
+
+
+#Load the weights
+state_dict = load_file("reasoning/singularis/weights/model.safetensors")
 
 encoder_sd = {k[len("model.encoder."):]: v for k, v in state_dict.items() if k.startswith("model.encoder.")}
 decoder_sd = {k[len("model.decoder."):]: v for k, v in state_dict.items() if k.startswith("model.decoder.")}
@@ -29,6 +52,7 @@ decoder = decoder.to(torch.bfloat16)
 encoder = encoder.to(torch.bfloat16)
 
 if __name__ == "__main__":
+    print(state_dict)
 
     # From config:
     # vocab_size: 262144  (boi=255999, eoi=256000, image=256001 — stay below these for text-only)
