@@ -98,9 +98,11 @@ def build_decoder_input(labels, tokenizer):
 
 
 def run_epoch(model, loader, optimizer, criterion, tokenizer, device, train=True):
+    # Always keep the encoder weights frozen
     model.singularis.encoder.eval()
     # Decoder base weights are frozen; LoRA adapters toggle with train/eval
     model.singularis.decoder.train() if train else model.singularis.decoder.eval()
+    #Train the URM Bridge
     model.singularis.urm_bridge.train() if train else model.singularis.urm_bridge.eval()
 
     total_loss     = 0.0

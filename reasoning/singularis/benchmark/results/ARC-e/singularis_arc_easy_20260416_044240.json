@@ -1,0 +1,146 @@
+{
+  "run": {
+    "model_id": "SingularisForConditionalGeneration",
+    "benchmark": "ARC-Easy",
+    "started_at": "2026-04-16T04:42:40.242446",
+    "finished_at": "2026-04-16T04:46:05.367602",
+    "duration_s": 205.1,
+    "batch_size": 8,
+    "torch_dtype": "bfloat16",
+    "decoding": "greedy",
+    "prompt_format": "Question + choices \u2192 Answer: <label>",
+    "notes": "pretrained encoder+decoder, randomized URM weights"
+  },
+  "summary": {
+    "total": 2376,
+    "correct": 287,
+    "incorrect": 2089,
+    "accuracy_pct": 12.08
+  },
+  "samples": {
+    "wrong": [
+      {
+        "id": 0,
+        "true": "A",
+        "pred": "",
+        "raw_output": "\u0928\u0932\u0928\u0932\u0928\u0932\u0928\u0932\u0928\u0932\u0928\u0932\u0928\u0932\u0928\u0932\u0928\u0932\u0928\u0932"
+      },
+      {
+        "id": 1,
+        "true": "B",
+        "pred": "A",
+        "raw_output": "M\u00fcller sparingly sparingly sparingly sparingly sparingly sparingly sparingly sparingly sparingly"
+      },
+      {
+        "id": 2,
+        "true": "D",
+        "pred": "",
+        "raw_output": " \u043a\u0430\u043a\u0442\u043e \u043a\u0430\u043a\u0442\u043e \u043a\u0430\u043a\u0442\u043e \u043a\u0430\u043a\u0442\u043e \u043a\u0430\u043a\u0442\u043e \u043a\u0430\u043a\u0442\u043e \u043a\u0430\u043a\u0442\u043e \u043a\u0430\u043a\u0442\u043e \u043a\u0430\u043a\u0442\u043e \u043a\u0430\u043a\u0442\u043e"
+      },
+      {
+        "id": 3,
+        "true": "D",
+        "pred": "",
+        "raw_output": " penny penny penny penny penny penny penny penny penny penny"
+      },
+      {
+        "id": 4,
+        "true": "B",
+        "pred": "C",
+        "raw_output": "cellorcellorcellorcellorcellorcellorcellorcellorcellorcellor"
+      },
+      {
+        "id": 6,
+        "true": "A",
+        "pred": "D",
+        "raw_output": "RecordRecordRecordRecordRecordRecordRecordRecordRecordRecord"
+      },
+      {
+        "id": 7,
+        "true": "C",
+        "pred": "A",
+        "raw_output": " NGOs NGOs NGOs NGOs NGOs NGOs NGOs NGOs NGOs MAXIMUM"
+      },
+      {
+        "id": 10,
+        "true": "B",
+        "pred": "C",
+        "raw_output": " princely princely princely princely princely princely princely princely princely princely"
+      },
+      {
+        "id": 11,
+        "true": "B",
+        "pred": "",
+        "raw_output": "utilit\u00e9utilit\u00e9utilit\u00e9utilit\u00e9utilit\u00e9utilit\u00e9utilit\u00e9utilit\u00e9utilit\u00e9utilit\u00e9"
+      },
+      {
+        "id": 12,
+        "true": "B",
+        "pred": "C",
+        "raw_output": " principalmente principalmente principalmente principalmente principalmente principalmente principalmente principalmente principalmente principalmente"
+      }
+    ],
+    "right": [
+      {
+        "id": 5,
+        "true": "C",
+        "pred": "C",
+        "raw_output": "CopyrightCopyrightCopyrightCopyrightCopyrightCopyrightCopyrightCopyrightCopyrightCopyright"
+      },
+      {
+        "id": 8,
+        "true": "C",
+        "pred": "C",
+        "raw_output": " coagulation coagulation coagulation coagulation coagulation coagulation coagulation coagulation coagulation coagulation"
+      },
+      {
+        "id": 9,
+        "true": "A",
+        "pred": "A",
+        "raw_output": " shall shall shall shall shall shall shall shall shall shall"
+      },
+      {
+        "id": 30,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "GameplayGameplayGameplayGameplay fall fall fall fall fall fall"
+      },
+      {
+        "id": 32,
+        "true": "A",
+        "pred": "A",
+        "raw_output": " Kaya Kaya Kaya Kaya Kaya Kaya Kaya Kaya Kaya Kaya"
+      },
+      {
+        "id": 34,
+        "true": "C",
+        "pred": "C",
+        "raw_output": " Recorder Recorder Recorder Recorder Recorder Recorder Recorder Recorder Recorder Recorder"
+      },
+      {
+        "id": 52,
+        "true": "C",
+        "pred": "C",
+        "raw_output": " ceremon ceremon ceremon ceremon ceremon ceremon ceremon ceremon ceremon ceremon"
+      },
+      {
+        "id": 60,
+        "true": "B",
+        "pred": "B",
+        "raw_output": "biobiobiobiobiobiobiobiobiobio"
+      },
+      {
+        "id": 64,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "andyandyandyandyandyandyandyandyandyandy"
+      },
+      {
+        "id": 65,
+        "true": "A",
+        "pred": "A",
+        "raw_output": " Mountaine Mountaine Mountaine Mountaine Mountaine Mountaine Mountaine Mountaine Mountaine Mountaine"
+      }
+    ]
+  }
+}
