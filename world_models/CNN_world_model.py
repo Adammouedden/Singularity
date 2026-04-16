@@ -93,9 +93,11 @@ class ActionModel(nn.Module):
 
 class CNNWorldModel():
     """Predict which actions lead to new frames."""
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, game_id, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+        self.game_id = 6 #game_id
         seed = int(time.time() * 1000000) + hash(self.game_id) % 1000000
+        
         random.seed(seed)
         np.random.seed(seed % (2**32 - 1))
         torch.manual_seed(seed % (2**32 - 1))
