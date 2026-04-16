@@ -76,7 +76,8 @@ train_dataset_arc_easy.set_format(type="torch", columns=["input_ids", "attention
 train_dataset_arc_challenge = dataset_arc_challenge["train"].map(preprocess_arc, remove_columns=dataset_arc_challenge["train"].column_names)
 train_dataset_arc_challenge.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
 
-
+train_dataset_ARC_only = ConcatDataset([train_dataset_arc_easy, train_dataset_arc_challenge])
+train_loader_ARC_only = DataLoader(train_dataset_ARC_only, batch_size=BATCH_SIZE)
 
 # Datasets are of different sizes, and GSM8K accounts for 70% of the data, so we'll use weights to sample an uniform distribution of
 # data from each dataset, ~33% each since we have replacement (reusing selected samples)

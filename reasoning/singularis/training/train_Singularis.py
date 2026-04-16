@@ -1,6 +1,7 @@
 from reasoning.singularis.model import SingularisForConditionalGeneration
 from reasoning.singularis.config_and_weights import URM_config, LLM_config, encoder_weights, decoder_weights
 from reasoning.singularis.training.datasets import train_loader_combined, test_loader_combined, tokenizer
+from transformers.modeling_outputs import Seq2SeqModelOutput
 
 import os
 import time
@@ -23,8 +24,8 @@ wandb.init(
         "lr": LR,
         "epochs": EPOCHS,
         "patience": PATIENCE,
-        "batch_size": 16,
-        "max_length": 256,
+        "batch_size": 8,
+        "max_length": 128,
         "optimizer": "AdamW",
         "datasets": ["gsm8k", "arc-easy", "arc-challenge"],
         "frozen": ["encoder", "decoder"],
@@ -45,9 +46,6 @@ for param in model.singularis.decoder.parameters():
 for param in model.singularis.urm_bridge.parameters():
     param.requires_grad = True
 
-# Recompute activations on backward pass to reduce VRAM usage
-model.gradient_checkpointing_enable()
-
 # Optimizer only covers URM parameters
 optimizer = torch.optim.AdamW(model.singularis.urm_bridge.parameters(), lr=LR)
 criterion = nn.CrossEntropyLoss(ignore_index=-100)
@@ -66,7 +64,9 @@ def run_epoch(loader, train=True):
     model.singularis.decoder.eval()
     model.singularis.urm_bridge.train() if train else model.singularis.urm_bridge.eval()
 
-    total_loss = 0.0
+    total_loss    = 0.0
+    correct_tokens = 0
+    total_tokens   = 0
     context = torch.enable_grad() if train else torch.no_grad()
 
     with context:
@@ -76,26 +76,50 @@ def run_epoch(loader, train=True):
             labels            = batch["labels"].to(device)
             decoder_input_ids = build_decoder_input(labels)
 
-            outputs = model.singularis(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                decoder_input_ids=decoder_input_ids,
-            )
+            # Run encoder under no_grad — frozen weights need no gradient tape
+            with torch.no_grad():
+                encoder_outputs = model.singularis.encoder(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    return_dict=True,
+                )
+            # Detach so the autograd graph starts fresh at the URM
+            encoder_hidden_states = encoder_outputs.last_hidden_state.detach()
 
-            logits = model.lm_head(outputs.last_hidden_state)   # [B, S, vocab_size]
+            # URM (trainable) + decoder (frozen, but needs encoder states)
+            urm_hidden_states = model.singularis.urm_bridge(encoder_hidden_states)
+
+            with torch.no_grad():
+                decoder_outputs = model.singularis.decoder(
+                    input_ids=decoder_input_ids,
+                    encoder_hidden_states=urm_hidden_states,
+                    encoder_attention_mask=attention_mask,
+                    return_dict=True,
+                )
+
+            logits = model.lm_head(decoder_outputs.last_hidden_state)  # [B, S, vocab_size]
             loss   = criterion(logits.view(-1, logits.size(-1)), labels.view(-1))
+
+            # Token-level accuracy over non-padding label positions
+            mask = labels != -100
+            preds = logits.argmax(dim=-1)
+            correct_tokens += (preds[mask] == labels[mask]).sum().item()
+            total_tokens   += mask.sum().item()
 
             if train:
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
                 if step % 100 == 0:
-                    print(f"  Step {step:>4} | Loss: {loss.item():.4f}")
+                    step_acc = (preds[mask] == labels[mask]).float().mean().item()
+                    print(f"  Step {step:>4} | Loss: {loss.item():.4f} | Acc: {step_acc:.3f}")
                 wandb.log({"train/step_loss": loss.item()})
 
             total_loss += loss.item()
 
-    return total_loss / len(loader)
+    avg_loss = total_loss / len(loader)
+    accuracy = correct_tokens / total_tokens if total_tokens > 0 else 0.0
+    return avg_loss, accuracy
 
 
 best_val_loss    = float("inf")
@@ -107,16 +131,18 @@ for epoch in range(EPOCHS):
     print(f"\nEpoch {epoch + 1}/{EPOCHS}")
     t0 = time.time()
 
-    train_loss = run_epoch(train_loader_combined, train=True)
-    val_loss   = run_epoch(test_loader_combined,  train=False)
+    train_loss, train_acc = run_epoch(train_loader_combined, train=True)
+    val_loss,   val_acc   = run_epoch(test_loader_combined,  train=False)
 
     elapsed = time.time() - t0
-    print(f"  Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Time: {elapsed:.1f}s")
+    print(f"  Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.3f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.3f} | Time: {elapsed:.1f}s")
 
     wandb.log({
         "epoch": epoch + 1,
         "train/epoch_loss": train_loss,
+        "train/epoch_acc": train_acc,
         "val/epoch_loss": val_loss,
+        "val/epoch_acc": val_acc,
         "epoch_time_s": elapsed,
     })
 
@@ -127,8 +153,9 @@ for epoch in range(EPOCHS):
             model.singularis.urm_bridge.state_dict(),
             os.path.join(CHECKPOINT_DIR, "urm_best.pt"),
         )
-        print(f"  Saved best model (val_loss={val_loss:.4f})")
+        print(f"  Saved best model (val_loss={val_loss:.4f}, val_acc={val_acc:.3f})")
         wandb.summary["best_val_loss"] = best_val_loss
+        wandb.summary["best_val_acc"]  = val_acc
     else:
         patience_counter += 1
         print(f"  No improvement ({patience_counter}/{PATIENCE})")
