@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 
 # --- Config ---
 model_id    = "google/t5gemma-2-270m-270m"
-results_dir = "reasoning/singularis/benchmark/results/ARC-e"
+results_dir = "reasoning/singularis/benchmark/results/ARC-c"
 batch_size  = 8
 n_samples   = 10  # number of wrong + correct examples to keep for inspection
 os.makedirs(results_dir, exist_ok=True)
@@ -29,9 +29,9 @@ model = AutoModelForSeq2SeqLM.from_pretrained(
 model.eval()
 print(f"[DEBUG] Model loaded on: {next(model.parameters()).device}")
 
-# --- Dataset: AI2_ARC (Easy subset) ---
+# --- Dataset: AI2_ARC (Challenge subset) ---
 # Format: {'question': str, 'choices': {'text': [str], 'label': [str]}, 'answerKey': str}
-dataset = load_dataset("ai2_arc", "ARC-Easy")["test"]
+dataset = load_dataset("ai2_arc", "ARC-Challenge")["test"]
 print(f"[DEBUG] Test set size: {len(dataset)}")
 
 # --- Answer Extraction ---
@@ -142,7 +142,7 @@ accuracy   = round(correct / total * 100, 2)
 output = {
     "run": {
         "model_id":      model_id,
-        "benchmark":     "ARC-Easy",
+        "benchmark":     "ARC-Challenge",
         "started_at":    start_time.isoformat(),
         "finished_at":   end_time.isoformat(),
         "duration_s":    round(duration_s, 1),
@@ -165,7 +165,7 @@ output = {
 }
 
 timestamp = start_time.strftime("%Y%m%d_%H%M%S")
-out_path  = os.path.join(results_dir, f"arc_easy_{timestamp}.json")
+out_path  = os.path.join(results_dir, f"arc_challenge_{timestamp}.json")
 with open(out_path, "w") as f:
     json.dump(output, f, indent=2)
 

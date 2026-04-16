@@ -1,0 +1,146 @@
+{
+  "run": {
+    "model_id": "google/t5gemma-2-270m-270m",
+    "benchmark": "ARC-Easy",
+    "started_at": "2026-04-16T03:16:17.528541",
+    "finished_at": "2026-04-16T03:19:48.928480",
+    "duration_s": 211.4,
+    "batch_size": 8,
+    "torch_dtype": "bfloat16",
+    "decoding": "greedy",
+    "prompt_format": "Question + choices \u2192 Answer: <label>",
+    "notes": "baseline \u2014 vanilla T5Gemma2-270m, no URM"
+  },
+  "summary": {
+    "total": 2376,
+    "correct": 578,
+    "incorrect": 1798,
+    "accuracy_pct": 24.33
+  },
+  "samples": {
+    "wrong": [
+      {
+        "id": 1,
+        "true": "B",
+        "pred": "A",
+        "raw_output": "\n(A) safety goggles\n(B)"
+      },
+      {
+        "id": 2,
+        "true": "D",
+        "pred": "A",
+        "raw_output": "\n(A) brain cells\n(B)"
+      },
+      {
+        "id": 3,
+        "true": "D",
+        "pred": "A",
+        "raw_output": "\n(A) gray\n(B) warm"
+      },
+      {
+        "id": 4,
+        "true": "B",
+        "pred": "A",
+        "raw_output": "\nA\nB\nC\nD\n\nSubmitted"
+      },
+      {
+        "id": 5,
+        "true": "C",
+        "pred": "A",
+        "raw_output": "\n(A) meter.\n(B)"
+      },
+      {
+        "id": 7,
+        "true": "C",
+        "pred": "A",
+        "raw_output": "\n(A) meters\n(B) centimeters"
+      },
+      {
+        "id": 8,
+        "true": "C",
+        "pred": "A",
+        "raw_output": "\n(A)\n(B)\n("
+      },
+      {
+        "id": 11,
+        "true": "B",
+        "pred": "A",
+        "raw_output": "\n(A)\n(B)\n("
+      },
+      {
+        "id": 12,
+        "true": "B",
+        "pred": "A",
+        "raw_output": "\n(A) electricity\n(B) gravity"
+      },
+      {
+        "id": 13,
+        "true": "B",
+        "pred": "A",
+        "raw_output": "\n(A) water pollution\n(B)"
+      }
+    ],
+    "right": [
+      {
+        "id": 0,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\nA. Sunlight is the source of energy for"
+      },
+      {
+        "id": 6,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\n(A) wash hands\n(B)"
+      },
+      {
+        "id": 9,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\n(A) Xylem carries water from the"
+      },
+      {
+        "id": 10,
+        "true": "B",
+        "pred": "B",
+        "raw_output": "\n(A) Rainfall increases.\n(B"
+      },
+      {
+        "id": 28,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\n(A) the current flowing through the wire"
+      },
+      {
+        "id": 30,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\n(A) Sunflower plant\n(B)"
+      },
+      {
+        "id": 32,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\n(A) carbon dioxide\n(B)"
+      },
+      {
+        "id": 33,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\n(A)\n(B)\n("
+      },
+      {
+        "id": 35,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\n(A)\n(B)\n("
+      },
+      {
+        "id": 42,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\n(A) winter\n(B) spring"
+      }
+    ]
+  }
+}
