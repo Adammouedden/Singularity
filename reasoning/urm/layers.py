@@ -13,7 +13,7 @@ try:
 except ImportError:
     from flash_attn import flash_attn_func
 
-from common import trunc_normal_init_
+from .common import trunc_normal_init_
 
 
 CosSin = Tuple[torch.Tensor, torch.Tensor]

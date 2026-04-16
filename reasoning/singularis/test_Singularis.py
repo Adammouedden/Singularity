@@ -6,27 +6,17 @@ tensor shape and connection through the pipeline is verified with prints.
 Run from the reasoning/ directory:
     python test_t5gemma2_urm.py
 """
-import os
-import sys
-
-_HERE   = os.path.dirname(os.path.abspath(__file__))
-_T5SRC  = os.path.abspath(os.path.join(_HERE, "..", "..", "..", "T5Gemma2", "transformers", "src"))
-for _p in [_HERE, _T5SRC]:
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
 
 import torch
-from transformers.models.t5gemma2.configuration_t5gemma2 import (
-    T5Gemma2Config, T5Gemma2TextConfig, T5Gemma2EncoderConfig, T5Gemma2DecoderConfig,
-)
+from transformers.models.t5gemma2.configuration_t5gemma2 import (T5Gemma2Config, T5Gemma2TextConfig, T5Gemma2EncoderConfig, T5Gemma2DecoderConfig)
 from transformers.models.siglip import SiglipVisionConfig
-from urm.URM import URMConfig
-from modeling_t5gemma2_urm import T5Gemma2WithURMForConditionalGeneration
+from reasoning.urm.URM import URMConfig
+from reasoning.singularis.model import SingularisForConditionalGeneration
 
 # ── Dimensions ───────────────────────────────────────────────────────────────
 # H must be identical for encoder, decoder, AND URM — no projections.
 H      = 640
-VOCAB  = 256
+VOCAB  = 262144
 B      = 2    # batch size
 S_ENC  = 8    # encoder sequence length
 S_DEC  = 4    # decoder sequence length
@@ -81,7 +71,7 @@ urm_cfg = URMConfig(
     num_layers=2,
     hidden_size=H,           # MUST match T5Gemma2 hidden_size
     expansion=2.0,
-    num_heads=2,
+    num_heads=4,
     pos_encodings="rope",
     loops=2,
     L_cycles=1,
@@ -91,11 +81,11 @@ print(f"    hidden_size : {urm_cfg.hidden_size}  (matches T5: {urm_cfg.hidden_si
 print(f"    loops       : {urm_cfg.loops}, L_cycles={urm_cfg.L_cycles}")
 
 # ── Instantiate model ─────────────────────────────────────────────────────────
-print("\n[3/4] Building T5Gemma2WithURMForConditionalGeneration...")
+print("\n[3/4] Building SingularisForConditionalGeneration...")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"    device : {device}")
 
-model = T5Gemma2WithURMForConditionalGeneration(t5_cfg, urm_cfg).to(device).eval()
+model = SingularisForConditionalGeneration(t5_cfg, urm_cfg).to(device).eval()
 
 total_params = sum(p.numel() for p in model.parameters())
 enc_params   = sum(p.numel() for p in model.model.encoder.parameters())

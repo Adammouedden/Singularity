@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from urm.URM import URM, URMCarry, URMConfig
+from reasoning.urm.URM import URM, URMCarry, URMConfig
 
 
 class URMBridge(nn.Module):

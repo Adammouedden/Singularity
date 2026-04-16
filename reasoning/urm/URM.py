@@ -5,8 +5,8 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from pydantic import BaseModel
-from common import trunc_normal_init_
-from layers import rms_norm, ConvSwiGLU, Attention, RotaryEmbedding, CosSin, CastedEmbedding, CastedLinear
+from .common import trunc_normal_init_
+from .layers import rms_norm, ConvSwiGLU, Attention, RotaryEmbedding, CosSin, CastedEmbedding, CastedLinear
 
 
 @dataclass
@@ -141,14 +141,16 @@ class URM_Inner(nn.Module):
         # Slice RoPE to the actual sequence length so shapes always match,
         # regardless of what seq_len was set to in URMConfig.
         cos_full, sin_full = self.rotary_emb()
-        actual_seq_len = input_embeddings.shape[1]
-        seq_info = dict(cos_sin=(cos_full[:actual_seq_len], sin_full[:actual_seq_len]))
-
+    
         ## if there are external embeddings, skip internal embeddings
         if input_hidden_states is not None:
             input_embeddings = input_hidden_states.to(self.forward_dtype)
         else:
             input_embeddings = self._input_embeddings(batch["inputs"], batch["puzzle_identifiers"])
+        
+  
+        actual_seq_len = input_embeddings.shape[1]
+        seq_info = dict(cos_sin=(cos_full[:actual_seq_len], sin_full[:actual_seq_len]))
         
 
         hidden_states = carry.current_hidden

@@ -6,7 +6,7 @@ from safetensors.torch import load_file
 from transformers.models.t5gemma2.modeling_t5gemma2 import T5Gemma2Encoder, T5Gemma2Decoder
 import torch
 
-state_dict = load_file("reasoning/model.safetensors")
+state_dict = load_file("reasoning/singularis/model.safetensors")
 #print(state_dict)
 
 

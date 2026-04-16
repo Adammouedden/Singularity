@@ -1,29 +1,12 @@
-import os
-import sys
-
-# reasoning/ is the directory containing this file — needed for urm_bridge and urm.URM imports
-_REASONING_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# T5Gemma2 is cloned separately outside the repo: Singularity/T5Gemma2/transformers/src
-_T5GEMMA2_SRC = os.path.abspath(
-    os.path.join(_REASONING_DIR, "..", "..", "..", "T5Gemma2", "transformers", "src")
-)
-
-for _p in [_REASONING_DIR, _T5GEMMA2_SRC]:
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
-
-from transformers.models.t5gemma2.modeling_t5gemma2 import (
-    T5Gemma2Model,
-    T5Gemma2ForConditionalGeneration,
-)
+from transformers.models.t5gemma2.modeling_t5gemma2 import (T5Gemma2Model, T5Gemma2ForConditionalGeneration)
 from transformers.modeling_outputs import Seq2SeqModelOutput
-from urm.URM import URMConfig
-from urm_bridge import URMBridge
-from scaffold_Singularis import encoder, decoder
+from reasoning.urm.URM import URMConfig
+from reasoning.singularis.urm_bridge import URMBridge
+
+from reasoning.singularis.config_and_weights import encoder, decoder
 
 
-class T5Gemma2WithURMModel(T5Gemma2Model):
+class Singularis(T5Gemma2Model):
 
     def __init__(self, config, urm_config: URMConfig):
         super().__init__(config)
@@ -92,7 +75,7 @@ class T5Gemma2WithURMModel(T5Gemma2Model):
     
 
 
-class T5Gemma2WithURMForConditionalGeneration(T5Gemma2ForConditionalGeneration):
+class SingularisForConditionalGeneration(T5Gemma2ForConditionalGeneration):
     """
     Drop-in replacement for T5Gemma2ForConditionalGeneration with a URM
     reasoning module inserted between the encoder and decoder.
@@ -103,5 +86,5 @@ class T5Gemma2WithURMForConditionalGeneration(T5Gemma2ForConditionalGeneration):
         # Replace the base model with the URM-augmented version, then retie
         # weights so lm_head.out_proj points to the new model's embed_tokens
         # (super().__init__ tied them to the first temporary T5Gemma2Model).
-        self.model = T5Gemma2WithURMModel(config, urm_config)
+        self.model = Singularis(config, urm_config)
         self.tie_weights()

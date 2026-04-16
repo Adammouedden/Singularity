@@ -1,4 +1,4 @@
 /examples
 .venv/
 .python-version
-/reasoning/model.safetensors
+/reasoning/singularis/model.safetensors

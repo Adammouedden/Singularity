@@ -1,5 +1,5 @@
 import torch
-from urm.URM import URM, URMCarry
+from URM import URM, URMCarry
 
 device = torch.device("cuda")
 
