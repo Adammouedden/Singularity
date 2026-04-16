@@ -1,0 +1,37 @@
+{
+  "os": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "python": "CPython 3.12.3",
+  "startedAt": "2026-04-16T12:03:23.949011Z",
+  "program": "<python with no main file>",
+  "git": {
+    "remote": "https://github.com/Adammouedden/Singularity.git",
+    "commit": "41af07b9f8a74d7810c3e7c4aad62837a1b8e5ff"
+  },
+  "email": "adam.mouedden@gmail.com",
+  "root": "/home/adamant/PROJECTS/Singularity",
+  "host": "Cyberpower-AM",
+  "executable": "/home/adamant/PROJECTS/Singularity/.venv/bin/python",
+  "cpu_count": 8,
+  "cpu_count_logical": 16,
+  "gpu": "NVIDIA GeForce RTX 4060",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "1081101176832",
+      "used": "126723596288"
+    }
+  },
+  "memory": {
+    "total": "16680931328"
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce RTX 4060",
+      "memoryTotal": "8585740288",
+      "architecture": "Ada",
+      "uuid": "GPU-ef76b5e9-070a-d604-d200-cd7ab00a0590"
+    }
+  ],
+  "cudaVersion": "13.1",
+  "writerId": "f20v87o9dfjxfcndf1wcxfywq1v9gx4h"
+}
