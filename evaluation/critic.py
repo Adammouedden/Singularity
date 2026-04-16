@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Transition-aware critic.
+Transition-aware critic with deterministic heuristic penalties.
 """
 from schemas.schemas import ActionCandidate, EvaluationResult
 from typing import List
@@ -17,11 +17,10 @@ from arc.state_abstraction import (
 
 load_dotenv(dotenv_path=".env")
 
-
 API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = "gemini-2.5-flash"
 
-# Will evaluate (state, action), end goal is to evaluate (state, goal-state)
+
 class GeminiCritic:
     def __init__(self, model_name: str = GEMINI_MODEL):
         self.client = genai.Client(api_key=API_KEY)
@@ -87,48 +86,103 @@ class GeminiCritic:
             })
 
         return serialized
-    
+
     def _build_prompt(self, prev_frame, transition_json):
         prev_summary = self._get_prev_summary(prev_frame)
 
         return f"""
-            You are evaluating action transitions for an ARC AGI task.
+You are evaluating action transitions for an ARC AGI task.
 
-            Current state abstraction:
-            {prev_summary}
+Current state abstraction:
+{prev_summary}
 
-            Candidate transitions:
-            {transition_json}
+Candidate transitions:
+{transition_json}
 
-            Your task:
-            Assign a score to EACH candidate transition.
+Your task:
+Assign a score to EACH candidate transition.
 
-            Scoring rules:
-            - Score range: 0.0 to 1.0
-            - 1.0 = very promising transition
-            - 0.0 = very poor transition
+Scoring rules:
+- Score range: 0.0 to 1.0
+- 1.0 = very promising transition
+- 0.0 = very poor transition
 
-            Heuristics:
-            - reward meaningful change
-            - reward pattern completion
-            - reward consistency
-            - penalize no-op or near-no-op transitions
-            - penalize changes mostly confined to border/UI-like regions
-            - penalize destructive edits
-            - prefer transitions with significant_change=True when justified
+Heuristics:
+- reward meaningful change
+- reward pattern completion
+- reward consistency
+- penalize no-op or near-no-op transitions heavily
+- penalize changes mostly confined to border/UI-like regions
+- penalize destructive edits
+- penalize large changes that do not suggest useful progress
+- prefer transitions with significant_change=True only when the change seems useful
 
-            Important:
-            - Compare transitions RELATIVE to each other
-            - Use a spread of scores
-            - Be consistent and deterministic
+Important:
+- Near-no-op transitions should usually score below 0.2
+- Border-dominated or likely UI-only changes should usually score below 0.25
+- Compare transitions RELATIVE to each other
+- Use a spread of scores
+- Be consistent and deterministic
 
-            Return JSON with:
-            - index
-            - score
-        """
+Return JSON with:
+- index
+- score
+"""
 
-        
-    # Evaluate all actions at once so it can compare each one relative to one another
+    def _heuristic_adjust_scores(
+        self,
+        prev_frame,
+        next_frames,
+        raw_scores: List[float],
+    ) -> List[float]:
+        prev_key = frame_to_key(prev_frame)
+        adjusted = []
+
+        seen_next_keys = set()
+
+        for score, next_frame in zip(raw_scores, next_frames):
+            next_key = frame_to_key(next_frame)
+            trans_abs = extract_transition_abstraction_from_keys(prev_key, next_key)
+
+            s = score
+
+            # Exact no-op
+            if next_key == prev_key:
+                s = min(s, 0.05)
+                s -= 0.25
+
+            # Duplicate candidate next frame in same batch
+            if next_key in seen_next_keys:
+                s -= 0.15
+            seen_next_keys.add(next_key)
+
+            # Tiny changes
+            if trans_abs.changed_cells == 0:
+                s = min(s, 0.05)
+            elif trans_abs.changed_cells <= 2:
+                s -= 0.20
+            elif trans_abs.changed_cells <= 5:
+                s -= 0.10
+
+            # Border/UI-like transitions
+            if trans_abs.border_changed_ratio >= 0.8 and trans_abs.changed_cells > 0:
+                s = min(s, 0.25)
+                s -= 0.15
+
+            # Non-significant change should not be rewarded much
+            if not trans_abs.significant_change:
+                s = min(s, 0.35)
+                s -= 0.10
+
+            # Mild reward for meaningful non-border change
+            if trans_abs.significant_change and trans_abs.border_changed_ratio < 0.5:
+                s += 0.05
+
+            s = max(0.0, min(1.0, s))
+            adjusted.append(s)
+
+        return adjusted
+
     def evaluate_transitions(
         self,
         prev_frame,
@@ -166,14 +220,19 @@ class GeminiCritic:
         else:
             parsed = EvaluationResult.model_validate_json(response.text)
 
-        # Handle incorrect structure returned by model
-        scores = [0.5] * len(actions)
+        raw_scores = [0.5] * len(actions)
 
         for item in parsed.results:
             idx = item.index
             score = max(0.0, min(1.0, item.score))
-            if 0 <= idx < len(scores):
-                scores[idx] = score
+            if 0 <= idx < len(raw_scores):
+                raw_scores[idx] = score
 
-        self.transition_eval_cache[cache_key] = tuple(scores)
-        return scores
+        final_scores = self._heuristic_adjust_scores(
+            prev_frame=prev_frame,
+            next_frames=next_frames,
+            raw_scores=raw_scores,
+        )
+
+        self.transition_eval_cache[cache_key] = tuple(final_scores)
+        return final_scores
