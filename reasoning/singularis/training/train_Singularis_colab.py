@@ -87,9 +87,13 @@ def run_epoch(loader, train=True):
         labels = batch["labels"].to(device)
         
         # Shift labels for causal input
-        decoder_input_ids = labels.clone()
-        decoder_input_ids[decoder_input_ids == -100] = tokenizer.pad_token_id
+        batch_size = labels.size(0)
+        bos_tokens = torch.full((batch_size, 1), tokenizer.bos_token_id, device=device)
         
+        # Clone and mask -100s for the input
+        dec_input_temp = labels.clone()
+        dec_input_temp[dec_input_temp == -100] = tokenizer.pad_token_id
+        decoder_input_ids = torch.cat([bos_tokens, dec_input_temp[:, :-1]], dim=1)
         # Use bfloat16 for stability on modern GPUs (no GradScaler needed)
         with torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16):
             with torch.no_grad():
