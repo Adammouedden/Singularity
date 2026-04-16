@@ -69,7 +69,14 @@ def calculate_accuracy(logits, labels):
 
 def run_epoch(loader, train=True):
     model.singularis.encoder.eval() # Always frozen
-    model.train() if train else model.eval()
+    if train:
+        model.singularis.urm_bridge.train()
+        model.singularis.decoder.train()
+        model.lm_head.train()
+    else:
+        model.singularis.urm_bridge.eval()
+        model.singularis.decoder.eval()
+        model.lm_head.eval()
     
     total_loss, total_acc = 0.0, 0.0
     optimizer.zero_grad()
@@ -83,44 +90,42 @@ def run_epoch(loader, train=True):
         decoder_input_ids = labels.clone()
         decoder_input_ids[decoder_input_ids == -100] = tokenizer.pad_token_id
         
-        # --- Inside run_epoch ---
-    # 1. Change the autocast dtype to bfloat16 for stability
-    with torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16):
-        with torch.no_grad():
-            encoder_outs = model.singularis.encoder(input_ids, attention_mask=attention_mask).last_hidden_state
-        
-        urm_outs = model.singularis.urm_bridge(encoder_outs)
-        
-        decoder_results = model.singularis.decoder(
-            input_ids=decoder_input_ids,
-            encoder_hidden_states=urm_outs,
-            encoder_attention_mask=attention_mask
-        )
-        
-        hidden_states = decoder_results.last_hidden_state if hasattr(decoder_results, 'last_hidden_state') else decoder_results
-        
-        logits = model.lm_head(hidden_states)
-        loss = criterion(logits.view(-1, logits.size(-1)), labels.view(-1))
-        loss = loss / GRAD_ACCUM_STEPS
+        # Use bfloat16 for stability on modern GPUs (no GradScaler needed)
+        with torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16):
+            with torch.no_grad():
+                encoder_outs = model.singularis.encoder(input_ids, attention_mask=attention_mask).last_hidden_state
+            
+            urm_outs = model.singularis.urm_bridge(encoder_outs)
+            
+            decoder_results = model.singularis.decoder(
+                input_ids=decoder_input_ids,
+                encoder_hidden_states=urm_outs,
+                encoder_attention_mask=attention_mask
+            )
+            
+            # Extract hidden states safely
+            h = decoder_results.last_hidden_state if hasattr(decoder_results, 'last_hidden_state') else decoder_results
+            
+            logits = model.lm_head(h)
+            loss = criterion(logits.view(-1, logits.size(-1)), labels.view(-1))
+            loss = loss / GRAD_ACCUM_STEPS
 
-    if train:
-        # 2. Direct backward pass (No scaler needed for bfloat16)
-        loss.backward()
-        
-        if (step + 1) % GRAD_ACCUM_STEPS == 0:
-            # 3. Standard clipping and step
-            torch.nn.utils.clip_grad_norm_(trainable_params, 1.0)
-            optimizer.step()
-            scheduler.step()
-            optimizer.zero_grad()
+        if train:
+            loss.backward()
+            
+            if (step + 1) % GRAD_ACCUM_STEPS == 0:
+                torch.nn.utils.clip_grad_norm_(trainable_params, 1.0)
+                optimizer.step()
+                scheduler.step()
+                optimizer.zero_grad()
 
-        # Metrics
+        # Metrics calculation
         acc = calculate_accuracy(logits, labels)
         total_loss += loss.item() * GRAD_ACCUM_STEPS
         total_acc += acc
 
         if step % 100 == 0:
-            print(f"{'Train' if train else 'Val'} Step {step} | Loss: {loss.item()*GRAD_ACCUM_STEPS:.4f} | Acc: {acc:.4f}")
+            print(f"{'Train' if train else 'Val'} Step {step:>4} | Loss: {loss.item()*GRAD_ACCUM_STEPS:.4f} | Acc: {acc:.4f}")
 
     return total_loss / len(loader), total_acc / len(loader)
 
