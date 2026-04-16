@@ -33,7 +33,7 @@ lora_config = LoraConfig(
 
 wandb.init(
     project="singularis",
-    name="singularis-refined-lora",
+    name="singularis-refined-lora-GSM8K-and-ARC",
     config={
         "lr": LR,
         "effective_batch_size": 8 * GRAD_ACCUM_STEPS,
@@ -83,37 +83,36 @@ def run_epoch(loader, train=True):
         decoder_input_ids = labels.clone()
         decoder_input_ids[decoder_input_ids == -100] = tokenizer.pad_token_id
         
-        with torch.amp.autocast(device_type="cuda", dtype=torch.float16):
-            with torch.no_grad():
-                # Encoder stays frozen
-                encoder_outs = model.singularis.encoder(input_ids, attention_mask=attention_mask).last_hidden_state
-            
-            # Forward through URM bridge
-            urm_outs = model.singularis.urm_bridge(encoder_outs)
-            
-            # Decoder (Now wrapped in LoRA)
-            decoder_results = model.singularis.decoder(
-                input_ids=decoder_input_ids,
-                encoder_hidden_states=urm_outs,
-                encoder_attention_mask=attention_mask
-            )
-            
-            # Robustly handle if decoder returns a dict/object or a raw tensor
-            hidden_states = decoder_results.last_hidden_state if hasattr(decoder_results, 'last_hidden_state') else decoder_results
-            
-            logits = model.lm_head(hidden_states)
-            loss = criterion(logits.view(-1, logits.size(-1)), labels.view(-1))
-            loss = loss / GRAD_ACCUM_STEPS
+        # --- Inside run_epoch ---
+    # 1. Change the autocast dtype to bfloat16 for stability
+    with torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16):
+        with torch.no_grad():
+            encoder_outs = model.singularis.encoder(input_ids, attention_mask=attention_mask).last_hidden_state
+        
+        urm_outs = model.singularis.urm_bridge(encoder_outs)
+        
+        decoder_results = model.singularis.decoder(
+            input_ids=decoder_input_ids,
+            encoder_hidden_states=urm_outs,
+            encoder_attention_mask=attention_mask
+        )
+        
+        hidden_states = decoder_results.last_hidden_state if hasattr(decoder_results, 'last_hidden_state') else decoder_results
+        
+        logits = model.lm_head(hidden_states)
+        loss = criterion(logits.view(-1, logits.size(-1)), labels.view(-1))
+        loss = loss / GRAD_ACCUM_STEPS
 
-        if train:
-            scaler.scale(loss).backward()
-            if (step + 1) % GRAD_ACCUM_STEPS == 0:
-                scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(trainable_params, 1.0) # Gradient Clipping
-                scaler.step(optimizer)
-                scaler.update()
-                scheduler.step()
-                optimizer.zero_grad()
+    if train:
+        # 2. Direct backward pass (No scaler needed for bfloat16)
+        loss.backward()
+        
+        if (step + 1) % GRAD_ACCUM_STEPS == 0:
+            # 3. Standard clipping and step
+            torch.nn.utils.clip_grad_norm_(trainable_params, 1.0)
+            optimizer.step()
+            scheduler.step()
+            optimizer.zero_grad()
 
         # Metrics
         acc = calculate_accuracy(logits, labels)
