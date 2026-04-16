@@ -12,7 +12,7 @@ from world_models.general_world_model import GeneralWorldModel
 def _default_initial_problem() -> EnvState:
 	return EnvState(
 		frame={
-			"problem": "Solve for x: 2x + 5 = 17",
+			"problem": "Solve for x: 2x + 5y = 17 - 9. Given y = 5",
 			"working": "",
 			"final_answer": None,
 		},
@@ -55,25 +55,30 @@ def main() -> None:
 	state = env.reset_game()
 	committed_actions: list[ActionCandidate] = []
 
-	# Hard cap: commit at most 2 actions, independent of terminal labels.
-	for i in range(2):
+	step_index = 0
+	print("Begining solving")
+	while state.state not in ["WIN", "GAME_OVER"]:
+		step_index += 1
 		action_to_commit: ActionCandidate | None = None
 
 		try:
 			decision = searcher.search(state)
 			action_to_commit = decision.best_action
 		except Exception as e:
-			print(f"[warn] MCTS failed at step {i + 1}: {e}")
+			print(f"[warn] MCTS failed at step {step_index}: {e}")
 			action_to_commit = _fallback_action_from_state(state)
 
 		if action_to_commit is None:
-			print(f"[warn] No action available to commit at step {i + 1}; stopping.")
+			print(f"[warn] No action available to commit at step {step_index}; stopping.")
 			break
 
 		committed_actions.append(action_to_commit)
 		state = env.step(state, action_to_commit)
 
-		print(f"step={i + 1} action={action_to_commit.action} state={state.state} score={state.score}")
+		print(
+			f"[COMMITTED] step={step_index} action={action_to_commit.action} "
+			f"state={state.state} score={state.score}"
+		)
 
 	print("\nCommitted actions:")
 	for idx, action in enumerate(committed_actions, start=1):

@@ -202,7 +202,7 @@ class ShallowMCTS:
 		current_state = start_state
 		current_sequence = list(base_action_sequence)
 
-		for _ in range(max_steps):
+		for rollout_step in range(max_steps):
 			if current_state.state in ["WIN", "GAME_OVER"]:
 				break
 
@@ -214,6 +214,12 @@ class ShallowMCTS:
 			current_sequence.append(action)
 
 			current_state = self.env.replay_sequence(current_sequence)
+			rationale = (action.rationale or "").replace("\n", " ").strip()
+			print(
+				f"[SIMULATED][NOT_COMMITTED] rollout_step={rollout_step + 1} "
+				f"action={action.action} state={current_state.state} score={current_state.score} "
+				f"rationale='{rationale}'"
+			)
 
 		return current_state
 
@@ -249,6 +255,12 @@ class ShallowMCTS:
 
 		child_sequence = node.action_sequence + [chosen_action]
 		child_state = self.env.replay_sequence(child_sequence)
+		rationale = (chosen_action.rationale or "").replace("\n", " ").strip()
+		print(
+			f"[SIMULATED][NOT_COMMITTED] expand_depth={node.depth + 1} "
+			f"action={chosen_action.action} state={child_state.state} score={child_state.score} "
+			f"rationale='{rationale}'"
+		)
 
 		child_node = self._make_child_node(
 			parent=node,
