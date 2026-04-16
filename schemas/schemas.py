@@ -1,6 +1,12 @@
 from __future__ import annotations
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Tuple
+
+#-----------------------------------#
+#-----------------------------------#
+#----------- WorldModel ------------#
+#-----------------------------------#
+#-----------------------------------#
 
 class ActionCandidate(BaseModel):
     action: str = Field(
@@ -40,6 +46,12 @@ class EnvState(BaseModel):
     guid: Optional[str] = None
     game_id: Optional[str] = None
     card_id: Optional[str] = None
+
+#-----------------------------------#
+#-----------------------------------#
+#-------------- MCTS ---------------#
+#-----------------------------------#
+#-----------------------------------#
 
 class MCTSNode(BaseModel):
     node_id: str
@@ -87,3 +99,43 @@ class MCTSDecision(BaseModel):
     best_child_node_id: Optional[str] = None
     node_registry: Dict[str, MCTSNode] = Field(default_factory=dict)
     iteration_logs: List[MCTSIteration] = Field(default_factory=list)
+
+#-----------------------------------#
+#-----------------------------------#
+#------- State Abstraction ---------#
+#-----------------------------------#
+#-----------------------------------#
+
+# Single-frame abstraction
+# "What objects and structure exist in this frame?"
+class ComponentInfo(BaseModel):
+    component_id: str
+    value: int
+    size: int
+    cells: List[Tuple[int, int]]
+    bbox: Tuple[int, int, int, int]   # min_row, min_col, max_row, max_col
+    centroid: Tuple[float, float]
+    touches_border: bool
+    width: int
+    height: int
+
+
+class FrameAbstraction(BaseModel):
+    height: int
+    width: int
+    value_counts: Dict[int, int]
+    num_components: int
+    components: List[ComponentInfo]
+
+
+# Transition abstraction
+# "What changed from prev frame -> current frame, and was it meaningful?"
+class TransitionAbstraction(BaseModel):
+    changed_cells: int
+    changed_ratio: float
+    changed_positions: List[Tuple[int, int]]
+    changed_bbox: Optional[Tuple[int, int, int, int]]
+    changed_value_pairs: Dict[str, int]  # e.g. "1->0": 4
+    border_changed_cells: int
+    border_changed_ratio: float
+    significant_change: bool

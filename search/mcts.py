@@ -23,18 +23,37 @@ class ShallowMCTS:
         self,
         proposer,
         critic,
+        CNN_as_proposer,
         env,
         num_iterations: int = 6,
         exploration_weight: float = 1.4,
+        rollout_depth: int = 1,
     ):
         self.proposer = proposer
         self.critic = critic
+        self.CNN_as_proposer = CNN_as_proposer
         self.env = env
         self.num_iterations = num_iterations
         self.exploration_weight = exploration_weight
+        self.rollout_depth = rollout_depth
 
+        self.replay_cache: Dict[Tuple[str, ...], EnvState] = {}
+        self.rank_cache: Dict[Tuple[str, ...], List[Tuple[ActionCandidate, float]]] = {}
         self.node_registry: Dict[str, MCTSNode] = {}
+
         self.iteration_logs: List[MCTSIteration] = []
+
+    def _sequence_key(self, action_sequence: List[ActionCandidate]) -> Tuple[str, ...]:
+        return tuple(self._action_key(a) for a in action_sequence)
+
+    def _cached_replay(self, action_sequence: List[ActionCandidate]) -> EnvState:
+        key = self._sequence_key(action_sequence)
+        if key in self.replay_cache:
+            return self.replay_cache[key]
+
+        state = self.env.replay_sequence(action_sequence)
+        self.replay_cache[key] = state
+        return state
 
     def _action_key(self, action: ActionCandidate) -> str:
         return f"{action.action}|{action.x}|{action.y}"
@@ -80,20 +99,40 @@ class ShallowMCTS:
     def _rank_actions_for_state(
         self,
         state: EnvState,
+        action_sequence: List[ActionCandidate],
     ) -> List[Tuple[ActionCandidate, float]]:
+        seq_key = self._sequence_key(action_sequence)
+        if seq_key in self.rank_cache:
+            return self.rank_cache[seq_key]
+
         proposal_result = self.proposer.propose_actions(
-            frame=state.frame,
+            frame=state if self.CNN_as_proposer else state.frame,
             actions=state.available_actions,
         )
         candidates: List[ActionCandidate] = proposal_result.candidates
 
         if not candidates:
+            self.rank_cache[seq_key] = []
             return []
 
-        scores = self.critic.evaluate_batch(state.frame, candidates)
+        next_states = []
+        for action in candidates:
+            seq = action_sequence + [action]
+            child_state = self._cached_replay(seq)
+            next_states.append(child_state)
+
+        next_frames = [s.frame for s in next_states]
+
+        scores = self.critic.evaluate_transitions(
+            prev_frame=state.frame,
+            actions=candidates,
+            next_frames=next_frames,
+        )
 
         ranked = list(zip(candidates, scores))
         ranked.sort(key=lambda x: x[1], reverse=True)
+
+        self.rank_cache[seq_key] = ranked
         return ranked
 
     def _ensure_candidates(self, node: MCTSNode) -> None:
@@ -103,7 +142,10 @@ class ShallowMCTS:
         if node.candidate_actions:
             return
 
-        ranked = self._rank_actions_for_state(node.state)
+        ranked = self._rank_actions_for_state(
+            state=node.state,
+            action_sequence=node.action_sequence,
+        )
 
         deduped_actions = []
         deduped_scores = []
@@ -121,7 +163,6 @@ class ShallowMCTS:
         node.candidate_scores = deduped_scores
 
     def _has_unexpanded_actions(self, node: MCTSNode) -> bool:
-        self._ensure_candidates(node)
         expanded_keys = set(node.expanded_action_keys)
 
         for action in node.candidate_actions:
@@ -201,10 +242,10 @@ class ShallowMCTS:
         return critic_score + terminal_bonus + env_bonus
 
     def _rollout(
-    self,
-    start_state: EnvState,
-    base_action_sequence: List[ActionCandidate],
-    max_steps: int = 2,
+        self,
+        start_state: EnvState,
+        base_action_sequence: List[ActionCandidate],
+        max_steps: int,
     ) -> EnvState:
         """
         Simulate forward from an already-materialized state by repeatedly:
@@ -221,14 +262,17 @@ class ShallowMCTS:
             if current_state.state in ["WIN", "GAME_OVER"]:
                 break
 
-            ranked = self._rank_actions_for_state(current_state)
+            ranked = self._rank_actions_for_state(
+                state=current_state,
+                action_sequence=current_sequence,
+            )
             if not ranked:
                 break
 
             action = ranked[0][0]  # greedy rollout for now
             current_sequence.append(action)
 
-            current_state = self.env.replay_sequence(current_sequence)
+            current_state = self._cached_replay(current_sequence)
 
         return current_state
 
@@ -263,7 +307,7 @@ class ShallowMCTS:
             )
 
         child_sequence = node.action_sequence + [chosen_action]
-        child_state = self.env.replay_sequence(child_sequence)
+        child_state = self._cached_replay(child_sequence)
 
         child_node = self._make_child_node(
             parent=node,
@@ -274,7 +318,7 @@ class ShallowMCTS:
         rollout_state = self._rollout(
             start_state=child_state,
             base_action_sequence=child_sequence,
-            max_steps=2,
+            max_steps=self.rollout_depth,
         )
 
         leaf_value = self._score_materialized_state(
@@ -331,6 +375,8 @@ class ShallowMCTS:
         return stats
 
     def search(self, root_state: EnvState) -> MCTSDecision:
+        self.replay_cache = {self._sequence_key([]): root_state}
+        self.rank_cache = {}
         self.node_registry = {}
         self.iteration_logs = []
 
@@ -378,7 +424,7 @@ class ShallowMCTS:
                 raise ValueError("No root candidates available.")
             best_action = root.candidate_actions[0]
             best_child_node_id = None
-
+        
         return MCTSDecision(
             root_state=root_state,
             candidates=root.candidate_actions,

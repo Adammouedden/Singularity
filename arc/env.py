@@ -181,10 +181,12 @@ class OfflineARCEnvironment(BaseARCEnvironment):
         environments_dir: Optional[str] = None,
         recordings_dir: Optional[str] = None,
         seed: Optional[int] = None,
+        DEBUG_SEARCH: bool = False,
     ):
         super().__init__(game_id=game_id, card_id=None)
         self.render_mode = render_mode
         self.seed = seed
+        self.DEBUG_SEARCH = DEBUG_SEARCH
 
         try:
             from arc_agi import Arcade, OperationMode  # type: ignore
@@ -201,7 +203,7 @@ class OfflineARCEnvironment(BaseARCEnvironment):
         self.environments_dir = environments_dir
         self.recordings_dir = recordings_dir
 
-        print(
+        if self.DEBUG_SEARCH: print(
             f"[OfflineARCEnvironment.__init__] "
             f"operation_mode={operation_mode}, "
             f"environments_dir={self.environments_dir}"
@@ -228,7 +230,7 @@ class OfflineARCEnvironment(BaseARCEnvironment):
         available = self.arc.get_environments()
         available_ids = [g.game_id for g in available]
 
-        print(f"[OfflineARCEnvironment] available local game_ids: {available_ids}")
+        if self.DEBUG_SEARCH: print(f"[OfflineARCEnvironment] available local game_ids: {available_ids}")
 
         self.env = self.arc.make(self.game_id, **make_kwargs)
 
@@ -303,10 +305,25 @@ class OfflineARCEnvironment(BaseARCEnvironment):
                     continue
         return actions
 
+    def _normalize_state_name(self, state_obj: Any) -> str:
+        if state_obj is None:
+            return "NOT_FINISHED"
+
+        # Enum-like object
+        if hasattr(state_obj, "name"):
+            return str(state_obj.name)
+
+        s = str(state_obj)
+        if "." in s:
+            s = s.split(".")[-1]
+        return s
+
     def _to_env_state(self, obs: Any, step_index: int) -> EnvState:
         frame = self._normalize_frame(self._get_attr(obs, "frame"))
-        print(type(frame), type(frame[0]), type(frame[0][0]))
-        state = self._get_attr(obs, "state", "NOT_FINISHED")
+
+        state_obj = self._get_attr(obs, "state", "NOT_FINISHED")
+        state = self._normalize_state_name(state_obj)
+
         score = float(self._get_attr(obs, "score", 0.0))
 
         # toolkit docs expose env.action_space and note actions update each step
@@ -335,7 +352,8 @@ class OfflineARCEnvironment(BaseARCEnvironment):
             raise ValueError(f"Invalid action name for offline mode: {action_name}") from e
 
     def reset_game(self) -> EnvState:
-        self._make_env()
+        if self.env is None:
+            self._make_env()
         obs = self.env.reset()
         return self._to_env_state(obs, step_index=0)
 
@@ -384,8 +402,18 @@ def create_environment(
     seed: Optional[int] = None,
     environments_dir: Optional[str] = None,
     recordings_dir: Optional[str] = None,
+    DEBUG_SEARCH: bool = False,
 ) -> BaseARCEnvironment:
     mode = mode.lower()
+
+    if mode == "online":
+        return HTTPARCEnvironment(
+            root_url=root_url,
+            api_key=api_key,
+            game_id=game_id,
+            card_id=card_id,
+            session=session,
+        )
 
     if mode in {"offline", "normal", "online_toolkit"}:
         operation_mode = {
@@ -401,6 +429,7 @@ def create_environment(
             environments_dir=environments_dir,
             recordings_dir=recordings_dir,
             seed=seed,
+            DEBUG_SEARCH=DEBUG_SEARCH,
         )
 
     raise ValueError(f"Unknown environment mode: {mode}")
