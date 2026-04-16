@@ -22,12 +22,13 @@ CHECKPOINT_DIR = "checkpoints"
 
 # --- LoRA Config ---
 lora_config = LoraConfig(
-    r=32,                # Increased rank for higher capacity
-    lora_alpha=64,       # Scaled with rank
-    target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],
+    r=32,
+    lora_alpha=64,
+    # Ensure these names match the actual attributes in your T5Gemma2Decoder
+    target_modules=["q_proj", "v_proj", "k_proj", "o_proj"], 
     lora_dropout=0.1,
     bias="none",
-    task_type=TaskType.CAUSAL_LM 
+    task_type=None  # <--- Change this from TaskType.CAUSAL_LM
 )
 
 wandb.init(
@@ -84,17 +85,23 @@ def run_epoch(loader, train=True):
         
         with torch.amp.autocast(device_type="cuda", dtype=torch.float16):
             with torch.no_grad():
+                # Encoder stays frozen
                 encoder_outs = model.singularis.encoder(input_ids, attention_mask=attention_mask).last_hidden_state
             
-            # Forward through URM and Decoder
+            # Forward through URM bridge
             urm_outs = model.singularis.urm_bridge(encoder_outs)
-            decoder_outs = model.singularis.decoder(
+            
+            # Decoder (Now wrapped in LoRA)
+            decoder_results = model.singularis.decoder(
                 input_ids=decoder_input_ids,
                 encoder_hidden_states=urm_outs,
                 encoder_attention_mask=attention_mask
-            ).last_hidden_state
+            )
             
-            logits = model.lm_head(decoder_outs)
+            # Robustly handle if decoder returns a dict/object or a raw tensor
+            hidden_states = decoder_results.last_hidden_state if hasattr(decoder_results, 'last_hidden_state') else decoder_results
+            
+            logits = model.lm_head(hidden_states)
             loss = criterion(logits.view(-1, logits.size(-1)), labels.view(-1))
             loss = loss / GRAD_ACCUM_STEPS
 
