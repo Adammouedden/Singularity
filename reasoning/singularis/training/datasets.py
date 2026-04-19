@@ -97,12 +97,19 @@ train_loader_combined = DataLoader(train_dataset_combined, batch_size=BATCH_SIZE
 # Test splits — no weighted sampler, evaluate on true distribution
 test_dataset_gsm8k = dataset_gsm8k["test"].map(preprocess_gsm8k, remove_columns=dataset_gsm8k["test"].column_names)
 test_dataset_gsm8k.set_format("torch")
+# Individual train loader for GSM8K
+test_loader_gsm8k = DataLoader(test_dataset_gsm8k, batch_size=BATCH_SIZE, shuffle=False)
 
 test_dataset_arc_easy = dataset_ai2_arc["test"].map(preprocess_arc, remove_columns=dataset_ai2_arc["test"].column_names)
 test_dataset_arc_easy.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
+# Individual train loader for ARC Easy
+test_loader_arc_easy = DataLoader(test_dataset_arc_easy, batch_size=BATCH_SIZE, shuffle=False)
+
 
 test_dataset_arc_challenge = dataset_arc_challenge["test"].map(preprocess_arc, remove_columns=dataset_arc_challenge["test"].column_names)
 test_dataset_arc_challenge.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
+# Individual train loader for ARC Challenge
+test_loader_arc_challenge = DataLoader(test_dataset_arc_challenge, batch_size=BATCH_SIZE, shuffle=False)
 
 test_dataset_combined = ConcatDataset([test_dataset_gsm8k, test_dataset_arc_easy, test_dataset_arc_challenge])
 test_loader_combined = DataLoader(test_dataset_combined, batch_size=BATCH_SIZE, shuffle=False)
