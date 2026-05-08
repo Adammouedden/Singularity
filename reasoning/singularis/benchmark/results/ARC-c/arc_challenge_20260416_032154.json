@@ -1,0 +1,146 @@
+{
+  "run": {
+    "model_id": "google/t5gemma-2-270m-270m",
+    "benchmark": "ARC-Challenge",
+    "started_at": "2026-04-16T03:21:54.945547",
+    "finished_at": "2026-04-16T03:23:40.527429",
+    "duration_s": 105.6,
+    "batch_size": 8,
+    "torch_dtype": "bfloat16",
+    "decoding": "greedy",
+    "prompt_format": "Question + choices \u2192 Answer: <label>",
+    "notes": "baseline \u2014 vanilla T5Gemma2-270m, no URM"
+  },
+  "summary": {
+    "total": 1172,
+    "correct": 267,
+    "incorrect": 905,
+    "accuracy_pct": 22.78
+  },
+  "samples": {
+    "wrong": [
+      {
+        "id": 0,
+        "true": "C",
+        "pred": "A",
+        "raw_output": "\n(A) Planetary density will decrease.\n"
+      },
+      {
+        "id": 1,
+        "true": "B",
+        "pred": "D",
+        "raw_output": "<strong>D</strong>\n<strong>Answer:</strong>\nThe"
+      },
+      {
+        "id": 2,
+        "true": "C",
+        "pred": "A",
+        "raw_output": "\n(A)\n(B)\n("
+      },
+      {
+        "id": 3,
+        "true": "D",
+        "pred": "A",
+        "raw_output": "\n(A) the control\n(B)"
+      },
+      {
+        "id": 4,
+        "true": "D",
+        "pred": "A",
+        "raw_output": "\n(A) They have each lost kinetic energy"
+      },
+      {
+        "id": 5,
+        "true": "B",
+        "pred": "A",
+        "raw_output": "\n(A) a non-infectious,"
+      },
+      {
+        "id": 6,
+        "true": "C",
+        "pred": "A",
+        "raw_output": "\nA. to repare for migration before winter"
+      },
+      {
+        "id": 7,
+        "true": "C",
+        "pred": "A",
+        "raw_output": "\n(A) There was once more water in"
+      },
+      {
+        "id": 8,
+        "true": "B",
+        "pred": "A",
+        "raw_output": "\n(A) The chicken population would go down"
+      },
+      {
+        "id": 10,
+        "true": "B",
+        "pred": "A",
+        "raw_output": "\n(A) life processes\n(B)"
+      }
+    ],
+    "right": [
+      {
+        "id": 9,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\n(A) the atom\n(B)"
+      },
+      {
+        "id": 11,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\n(A) The Sun influences the formation of"
+      },
+      {
+        "id": 18,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\nA\nB\nC\nD\nExplanation"
+      },
+      {
+        "id": 22,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\nA\nB\nC\nD\n\nSubmitted"
+      },
+      {
+        "id": 32,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\n(A)\n(B)\n("
+      },
+      {
+        "id": 34,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\n(A) sunrise\n(B) equ"
+      },
+      {
+        "id": 35,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\nA\nB\nC\nD\nExplanation"
+      },
+      {
+        "id": 41,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\n(A) The new Moon occurs\n("
+      },
+      {
+        "id": 49,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\nA. A tiger hunts a deer\nB"
+      },
+      {
+        "id": 57,
+        "true": "A",
+        "pred": "A",
+        "raw_output": "\n(A) to generate an electric current\n"
+      }
+    ]
+  }
+}
