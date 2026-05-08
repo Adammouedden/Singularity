@@ -1,3 +1,7 @@
-.venv
+/examples
+.venv/
+.python-version
+/reasoning/singularis/weights/model.safetensors
+/checkpoints/urm_best.pt
 .env
 **/__pycache__

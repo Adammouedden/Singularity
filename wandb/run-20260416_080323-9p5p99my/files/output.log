@@ -1,0 +1,6 @@
+Injected 72 LoRA adapters into decoder
+Parameters: 807,106,802 trainable / 1,593,136,098 total (50.66%)
+_______________________________________ TRAINING LOOP BEGINS _______________________________________
+
+Epoch 1/50
+  Step    0 | Loss: 14.8125 | Acc: 0.000
